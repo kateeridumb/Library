@@ -1,0 +1,166 @@
+/* Мобильные адаптации для разных типов устройств
+   - телефоны: до 576px
+   - небольшие планшеты: 576–768px
+   - планшеты: 768–992px
+*/
+
+/* Общие мобильные стили */
+@media (max-width: 992px) {
+    body {
+        font-size: 15px;
+    }
+
+    .main-content {
+        padding: 1.25rem 0;
+    }
+
+    .container {
+        max-width: 100%;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .navbar-custom {
+        padding: 0.5rem 0;
+    }
+
+    /* Чиним иконку "бургерного" меню, чтобы не накладывалась */
+    .navbar-toggler {
+        border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    .navbar-toggler-icon {
+        background-image: none !important; /* убираем стандартную иконку Bootstrap */
+        font-size: 1.4rem;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.6rem;
+        height: 1.6rem;
+    }
+
+    .navbar-brand span {
+        font-size: 1.2rem;
+    }
+
+    .navbar-nav .nav-link {
+        padding: 0.5rem 0.8rem !important;
+        margin: 0.15rem 0.15rem;
+    }
+
+    .role-badge {
+        padding: 0.4rem 0.9rem;
+        font-size: 0.8rem;
+    }
+
+    .custom-card,
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+
+    .book-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .book-cover {
+        height: 170px;
+    }
+
+    .btn-custom {
+        width: 100%;
+        margin-bottom: 0.4rem;
+        font-size: 0.9rem;
+        padding: 0.65rem 1rem;
+    }
+
+    /* Экран чтения книги: делаем книгу на весь доступный экран */
+    .reader-wrapper {
+        height: 100vh;
+        padding: 0;
+    }
+
+    .reader-container {
+        height: calc(100vh - 56px); /* примерно высота хедера чтения */
+        padding: 0;
+    }
+
+    .reader-content {
+        padding: 8px;
+    }
+
+    .book-viewer,
+    .pdf-viewer,
+    .epub-viewer,
+    .text-viewer {
+        height: 100%;
+        border-radius: 0;
+    }
+
+    .reader-footer {
+        padding-bottom: 8px;
+    }
+}
+
+/* Телефоны (портрет) */
+@media (max-width: 576px) {
+    h1 {
+        font-size: 1.6rem;
+    }
+
+    h2 {
+        font-size: 1.3rem;
+    }
+
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+
+    .navbar-brand i {
+        font-size: 1.3rem;
+    }
+
+    .grid-container {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .book-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .book-cover {
+        height: 150px;
+    }
+
+    .footer-custom .container {
+        flex-direction: column;
+        gap: 0.75rem;
+        text-align: center;
+    }
+}
+
+/* Небольшие планшеты */
+@media (min-width: 576px) and (max-width: 767.98px) {
+    .book-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .book-cover {
+        height: 180px;
+    }
+}
+
+/* Планшеты (альбомная, крупные телефоны) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .book-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+
+    .book-cover {
+        height: 190px;
+    }
+}
+
+

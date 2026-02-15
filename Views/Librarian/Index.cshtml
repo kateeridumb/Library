@@ -1,0 +1,245 @@
+﻿@using LibraryMPT.Models
+@{
+    ViewBag.Title = "Панель библиотекаря";
+    Layout = "_Layout";
+    var stats = ViewBag.Stats as LibrarianStatsDto ?? new LibrarianStatsDto();
+    var pendingCount = ViewData["PendingSubscriptionsCount"] as int? ?? 0;
+    var categoryStats = ViewBag.CategoryStats as List<CategoryStatDto> ?? new List<CategoryStatDto>();
+    var lastBooks = ViewBag.LastBooks as List<LastBookDto> ?? new List<LastBookDto>();
+}
+
+<div class="container fade-in">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-5">
+        <div class="mb-4 mb-md-0">
+            <h1 class="mb-2">
+                <i class="fas fa-book-reader me-3"></i>Панель библиотекаря
+            </h1>
+            <p class="lead text-muted">Управление книгами, каталогами и читателями</p>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <a href="@Url.Action("Index", "Home")" class="btn btn-light-custom btn-custom">
+                <i class="fas fa-home"></i> На главную
+            </a>
+        </div>
+    </div>
+
+    <div class="alert alert-info-custom alert-custom mb-5">
+        <i class="fas fa-book-open fa-2x"></i>
+        <div>
+            <h5 class="alert-heading mb-2">📖 Добро пожаловать, библиотекарь!</h5>
+            <p class="mb-0">Здесь вы можете управлять каталогом книг, категориями и помогать читателям.</p>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <a asp-action="SubscriptionRequests" class="btn btn-primary btn-lg w-100 mb-3" style="padding: 1rem; font-size: 1.1rem;">
+                <i class="fas fa-clipboard-list me-2"></i>Заявки на подписки
+                @if (pendingCount > 0)
+                {
+                    <span class="badge bg-danger ms-2">@pendingCount</span>
+                }
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-5">
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card">
+                <i class="fas fa-book fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@stats.BooksCount</div>
+                <div class="stat-label">Книг в каталоге</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card">
+                <i class="fas fa-tags fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@stats.CategoriesCount</div>
+                <div class="stat-label">Категорий</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card">
+                <i class="fas fa-user-clock fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@stats.ActiveReadersCount</div>
+                <div class="stat-label">Активных читателей</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card">
+                <i class="fas fa-exchange-alt fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@stats.ActionsThisMonth</div>
+                <div class="stat-label">Действий за месяц</div>
+            </div>
+        </div>
+    </div>
+
+    <h2 class="mb-4">
+        <i class="fas fa-th-large me-3"></i>Управление библиотекой
+    </h2>
+
+    <div class="grid-container">
+        <div class="custom-card">
+            <div class="custom-card-header" style="background: linear-gradient(135deg, #3498DB 0%, #5DADE2 100%);">
+                <h5><i class="fas fa-book"></i> Управление книгами</h5>
+            </div>
+            <div class="custom-card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="stat-number">@stats.BooksCount</div>
+                    <div>
+                        <div class="stat-label">книг в базе</div>
+                    </div>
+                </div>
+                <ul class="feature-list mb-3">
+                    <li><i class="fas fa-plus-circle"></i> Добавление книги</li>
+                    <li><i class="fas fa-minus-circle"></i> Удаление книги</li>
+                    <li><i class="fas fa-pen-to-square"></i> Редактирование информации</li>
+                    <li><i class="fas fa-search"></i> Поиск и фильтрация</li>
+                </ul>
+                <a href="@Url.Action("BookManagement", "Librarian")"
+                   class="btn btn-primary-custom btn-custom w-100">
+                    <i class="fas fa-external-link-alt"></i> Управление книгами
+                </a>
+            </div>
+        </div>
+
+        <div class="custom-card">
+            <div class="custom-card-header" style="background: linear-gradient(135deg, #2ECC71 0%, #58D68D 100%);">
+                <h5><i class="fas fa-tags"></i> Управление категориями</h5>
+            </div>
+            <div class="custom-card-body">
+                <div class="mb-3">
+                    @foreach (var cat in categoryStats)
+                    {
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>@cat.CategoryName</span>
+
+                            <span class="badge bg-primary">@cat.BooksCount</span>
+                        </div>
+                    }
+
+                </div>
+                <ul class="feature-list mb-3">
+                    <li><i class="fas fa-plus-circle"></i> Добавление категории</li>
+                    <li><i class="fas fa-pen-to-square"></i> Редактирование категории</li>
+                    <li><i class="fas fa-trash-alt"></i> Удаление категорий</li>
+                    <li><i class="fas fa-sitemap"></i> Иерархия категорий</li>
+                </ul>
+                <a href="@Url.Action("CategoryManagement", "Librarian")"
+                   class="btn btn-primary-custom btn-custom w-100">
+                    <i class="fas fa-folder-open"></i> Управление категориями
+                </a>
+            </div>
+        </div>
+
+        <div class="custom-card">
+            <div class="custom-card-header" style="background: linear-gradient(135deg, #9B59B6 0%, #BB8FCE 100%);">
+                <h5><i class="fas fa-book-medical"></i> Добавление книги</h5>
+            </div>
+            <div class="custom-card-body">
+                <ul class="feature-list mb-3">
+                    <li><i class="fas fa-font"></i> Основная информация</li>
+                    <li><i class="fas fa-user-pen"></i> Авторы и редакторы</li>
+                    <li><i class="fas fa-tag"></i> Категории и теги</li>
+                    <li><i class="fas fa-file-pdf"></i> Электронная версия</li>
+                </ul>
+                <a href="@Url.Action("AddBook", "Librarian")"
+                   class="btn btn-primary-custom btn-custom w-100">
+                    <i class="fas fa-plus-circle"></i> Добавить новую книгу
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="divider"></div>
+    <h3 class="mb-4"><i class="fas fa-bolt me-3"></i>Быстрые действия</h3>
+
+    <div class="row g-3 mb-5">
+        <div class="col-md-4 col-sm-6">
+            <a href="@Url.Action("AddBook", "Librarian")"
+               class="btn btn-outline-primary w-100 py-3 d-flex flex-column align-items-center">
+                <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                <span>Добавить книгу</span>
+            </a>
+        </div>
+        <div class="col-md-4 col-sm-6">
+            <a href="@Url.Action("AddCategory", "Librarian")"
+               class="btn btn-outline-success w-100 py-3 d-flex flex-column align-items-center">
+                <i class="fas fa-folder-plus fa-2x mb-2"></i>
+                <span>Новая категория</span>
+            </a>
+        </div>
+        <div class="col-md-4 col-sm-6">
+            <a href="@Url.Action("CategoryManagement", "Librarian")"
+               class="btn btn-outline-warning w-100 py-3 d-flex flex-column align-items-center">
+                <i class="fas fa-edit fa-2x mb-2"></i>
+                <span>Редактировать категории</span>
+            </a>
+        </div>
+        <div class="col-md-4 col-sm-6">
+            <a href="@Url.Action("AuthorManagement", "Librarian")"
+               class="btn btn-outline-info w-100 py-3 d-flex flex-column align-items-center">
+                <i class="fas fa-user-edit fa-2x mb-2"></i>
+                <span>Управление авторами</span>
+            </a>
+        </div>
+        <div class="col-md-4 col-sm-6">
+            <a href="@Url.Action("PublisherManagement", "Librarian")"
+               class="btn btn-outline-secondary w-100 py-3 d-flex flex-column align-items-center">
+                <i class="fas fa-building fa-2x mb-2"></i>
+                <span>Управление издательствами</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="custom-card">
+        <div class="custom-card-header">
+            <h5><i class="fas fa-clock me-2"></i>Последние добавленные книги</h5>
+        </div>
+        @foreach (var book in lastBooks)
+        {
+            <div class="col-md-4 mb-3">
+                <div class="d-flex align-items-center p-3 rounded-xl"
+                     style="background: var(--primary-lightest);">
+                    <i class="fas fa-book fa-2x text-primary-medium me-3"></i>
+                    <div>
+                        <h6 class="mb-1">@book.Title</h6>
+                        <p class="small text-muted mb-0">
+                            @book.Author • @book.Category
+                        </p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .grid-container {
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        }
+
+        .btn-outline-primary, .btn-outline-success, .btn-outline-warning {
+            border: 2px solid;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+            .btn-outline-primary:hover {
+                background-color: var(--primary-medium);
+                color: white;
+            }
+
+            .btn-outline-success:hover {
+                background-color: var(--accent-green);
+                color: white;
+            }
+
+            .btn-outline-warning:hover {
+                background-color: var(--accent-gold);
+                color: white;
+            }
+    </style>
+}

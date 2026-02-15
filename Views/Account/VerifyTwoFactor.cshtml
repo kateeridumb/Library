@@ -1,0 +1,135 @@
+@{
+    ViewBag.Title = "Подтверждение входа";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="custom-card" style="max-width: 420px; width: 100%;">
+        <div class="custom-card-header text-center"
+             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <h4 class="mb-0">
+                <i class="fas fa-shield-alt me-2"></i>Двухфакторная аутентификация
+            </h4>
+        </div>
+
+        <div class="custom-card-body">
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                Код подтверждения отправлен на ваш email Gmail. Проверьте почту и введите код ниже.
+            </div>
+
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger mb-3">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>
+                            <i class="fas fa-exclamation-circle me-2"></i>@error.ErrorMessage
+                        </div>
+                    }
+                </div>
+            }
+
+            <form method="post" id="verifyForm">
+                @Html.AntiForgeryToken()
+                <div class="mb-4">
+                    <label class="form-label fw-bold mb-3">Введите код подтверждения</label>
+                    <div class="code-input-container">
+                        <input type="text"
+                               name="code"
+                               id="codeInput"
+                               class="form-control rounded-xl text-center"
+                               placeholder="000000"
+                               maxlength="6"
+                               pattern="[0-9]{6}"
+                               style="font-size: 32px; letter-spacing: 12px; font-weight: bold; padding: 20px; border: 3px solid #667eea;"
+                               required
+                               autofocus
+                               autocomplete="off" />
+                    </div>
+                    <div class="form-text mt-3 text-center">
+                        <i class="fas fa-clock me-1"></i>Код действителен в течение 10 минут
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary-custom btn-custom w-100 mb-3"
+                        style="padding: 12px; font-size: 18px;">
+                    <i class="fas fa-check me-2"></i>Подтвердить вход
+                </button>
+            </form>
+
+            <div class="text-center">
+                <a href="@Url.Action("Login", "Account")" class="btn btn-link">
+                    <i class="fas fa-arrow-left me-1"></i>Вернуться к входу
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeInput = document.getElementById('codeInput');
+            
+            // Автоматическое форматирование кода - только цифры
+            codeInput.addEventListener('input', function(e) {
+                this.value = this.value.replace(/\D/g, '').substring(0, 6);
+                
+                // Автоматическая отправка формы при вводе 6 цифр
+                if (this.value.length === 6) {
+                    setTimeout(() => {
+                        document.getElementById('verifyForm').submit();
+                    }, 300);
+                }
+            });
+
+            // Фокус на поле при загрузке
+            codeInput.focus();
+            
+            // Выделение текста при клике
+            codeInput.addEventListener('click', function() {
+                this.select();
+            });
+        });
+    </script>
+}
+
+@section Styles {
+    <style>
+        .code-input-container {
+            position: relative;
+        }
+        
+        #codeInput:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+            outline: none;
+        }
+        
+        .custom-card {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @@keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+}
+

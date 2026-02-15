@@ -1,0 +1,229 @@
+@model List<LibraryMPT.Models.UserAdminDto>
+@using LibraryMPT.Models
+@{
+    ViewBag.Title = "Управление пользователями";
+    Layout = "_Layout";
+    var roles = ViewBag.Roles as List<Role> ?? new List<Role>();
+    var faculties = ViewBag.Faculties as List<Faculty> ?? new List<Faculty>();
+    string? roleFilter = ViewBag.RoleFilter as string;
+    string? facultyFilter = ViewBag.FacultyFilter as string;
+    string? statusFilter = ViewBag.StatusFilter as string;
+}
+
+<div class="container fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-users-cog me-2"></i>Управление пользователями
+        </h2>
+        <a asp-action="CreateStaff" asp-controller="Admin" class="btn btn-success">
+            <i class="fas fa-user-plus"></i> Добавить сотрудника
+        </a>
+    </div>
+
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Поиск по email</label>
+                    <input type="text" name="search" class="form-control" 
+                           value="@ViewBag.Search" placeholder="Введите email...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Роль</label>
+                    <select name="roleFilter" class="form-select">
+                        <option value="">Все роли</option>
+                        @foreach (var role in roles)
+                        {
+                            if (roleFilter == role.RoleName)
+                            {
+                                <option value="@role.RoleName" selected="selected">@role.RoleName</option>
+                            }
+                            else
+                            {
+                                <option value="@role.RoleName">@role.RoleName</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Факультет</label>
+                    <select name="facultyFilter" class="form-select">
+                        <option value="">Все факультеты</option>
+                        @foreach (var faculty in faculties)
+                        {
+                            if (facultyFilter == faculty.FacultyName)
+                            {
+                                <option value="@faculty.FacultyName" selected="selected">@faculty.FacultyName</option>
+                            }
+                            else
+                            {
+                                <option value="@faculty.FacultyName">@faculty.FacultyName</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Статус</label>
+                    <select name="statusFilter" class="form-select">
+                        <option value="">Все</option>
+                        @if (statusFilter == "active")
+                        {
+                            <option value="active" selected="selected">Активные</option>
+                        }
+                        else
+                        {
+                            <option value="active">Активные</option>
+                        }
+                        @if (statusFilter == "blocked")
+                        {
+                            <option value="blocked" selected="selected">Заблокированные</option>
+                        }
+                        else
+                        {
+                            <option value="blocked">Заблокированные</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Поиск
+                    </button>
+                    <a asp-action="UserManagement" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Сброс
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Роль</th>
+            <th>Факультет</th>
+            <th>Статус</th>
+            <th>Фамилия (расшифрованная)</th>
+            <th class="text-end"></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in Model)
+        {
+            <tr>
+                <td>@u.Email</td>
+
+                <td>
+                    <span class="badge
+                            @(u.RoleName == "Admin" ? "bg-danger" :
+                                                    u.RoleName == "Librarian" ? "bg-primary" : "bg-success")">
+                    @u.RoleName
+                </span>
+            </td>
+
+                <td>
+                    @(string.IsNullOrEmpty(u.FacultyName) ? "—" : u.FacultyName)
+                </td>
+
+                <td>
+                    @if (u.IsBlocked)
+                    {
+                        <span class="badge bg-secondary">Заблокирован</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-success">Активен</span>
+                    }
+                </td>
+
+                <td>
+                    <button class="btn btn-sm btn-info decrypt-btn" 
+                            data-user-id="@u.UserID"
+                            title="Расшифровать фамилию">
+                        <i class="fas fa-key"></i> Расшифровать
+                    </button>
+                    <span class="decrypted-name-@u.UserID ms-2"></span>
+                </td>
+
+                <td class="text-end d-flex justify-content-end gap-2">
+                    <a asp-action="EditUser"
+                       asp-route-id="@u.UserID"
+                       class="btn btn-sm btn-warning">
+                        ??
+                    </a>
+
+                @if (u.RoleName != "Admin")
+                    {
+                        <form asp-action="ToggleBlock"
+                              method="post"
+                              onsubmit="return confirm('@(u.IsBlocked ? "Разблокировать пользователя?" : "Заблокировать пользователя?")');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@u.UserID" />
+                            @if (u.IsBlocked)
+                            {
+                                <button class="btn btn-sm btn-success">
+                                    <i class="fas fa-unlock"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm btn-danger">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            }
+                        </form>
+                    }
+                    else
+                    {
+                        <span class="text-muted">—</span>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.decrypt-btn').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const userId = this.dataset.userId;
+                const span = document.querySelector(`.decrypted-name-${userId}`);
+                
+                if (span.textContent) {
+                    span.textContent = '';
+                    this.innerHTML = '<i class="fas fa-key"></i> Расшифровать';
+                    return;
+                }
+                
+                this.disabled = true;
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Загрузка...';
+                
+                try {
+                    const response = await fetch(`/Admin/DecryptLastName?userId=${userId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        span.textContent = data.lastName;
+                        span.className = 'decrypted-name-' + userId + ' ms-2 badge bg-info text-white';
+                        this.innerHTML = '<i class="fas fa-eye-slash"></i> Скрыть';
+                    } else {
+                        span.textContent = 'Ошибка: ' + (data.error || 'Неизвестная ошибка');
+                        span.className = 'decrypted-name-' + userId + ' ms-2 text-danger';
+                    }
+                } catch (error) {
+                    span.textContent = 'Ошибка загрузки';
+                    span.className = 'decrypted-name-' + userId + ' ms-2 text-danger';
+                } finally {
+                    this.disabled = false;
+                }
+            });
+        });
+    </script>
+}
+    </div>
+</div>
+

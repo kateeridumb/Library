@@ -1,0 +1,136 @@
+﻿@model LibraryMPT.Models.UserAdminDto
+
+@{
+    ViewData["Title"] = "Редактирование пользователя";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="custom-card">
+                <div class="custom-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-user-edit me-2"></i>Редактирование пользователя
+                    </h5>
+                </div>
+                <div class="custom-card-body">
+                    @if (TempData["Success"] != null)
+                    {
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    }
+
+                    @if (ViewBag.DecryptedLastName != null)
+                    {
+                        <div class="alert alert-info mb-3">
+                            <strong>Расшифрованная фамилия:</strong> @ViewBag.DecryptedLastName
+                            <br />
+                            <small class="text-muted">Демонстрация работы шифрования данных</small>
+                        </div>
+                    }
+
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Ошибки валидации:</h6>
+                            <ul class="mb-0">
+                                @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                                {
+                                    <li>@error.ErrorMessage</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+
+                    <form asp-action="EditUser" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="UserID" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input asp-for="Email" class="form-control" required />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Роль</label>
+                            <select asp-for="RoleID" class="form-select">
+                                @if (ViewBag.Roles != null)
+                                {
+                                    @foreach (var r in ViewBag.Roles)
+                                    {
+                                        @if (r.RoleID == Model.RoleID)
+                                        {
+                                            <option value="@r.RoleID" selected>@r.RoleName</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@r.RoleID">@r.RoleName</option>
+                                        }
+                                    }
+                                }
+                            </select>
+                        </div>
+
+                        @if (ViewBag.CanEditFaculty != false)
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Факультет</label>
+                                <select asp-for="FacultyID" class="form-select">
+                                    <option value="">— не выбран —</option>
+                                    @if (ViewBag.Faculties != null)
+                                    {
+                                        @foreach (var f in ViewBag.Faculties)
+                                        {
+                                            @if (Model.FacultyID.HasValue && f.FacultyID == Model.FacultyID.Value)
+                                            {
+                                                <option value="@f.FacultyID" selected>@f.FacultyName</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@f.FacultyID">@f.FacultyName</option>
+                                            }
+                                        }
+                                    }
+                                </select>
+                                <small class="form-text text-muted">
+                                    Назначение факультета необходимо для доступа к подпискам
+                                </small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Факультет</label>
+                                <input type="text" class="form-control" value="@(Model.FacultyName ?? "— не назначен —")" disabled />
+                                <small class="form-text text-muted">
+                                    Администраторы и библиотекари не могут иметь факультет
+                                </small>
+                            </div>
+                        }
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a asp-action="UserManagement" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Назад
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-1"></i> Сохранить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

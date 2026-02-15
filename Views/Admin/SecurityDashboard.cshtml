@@ -1,0 +1,548 @@
+@{
+    ViewBag.Title = "Мониторинг безопасности и производительности";
+    Layout = "_Layout";
+
+    int totalUsers = ViewBag.TotalUsers as int? ?? 0;
+    int totalBooks = ViewBag.TotalBooks as int? ?? 0;
+    int downloads24h = ViewBag.DownloadsLast24h as int? ?? 0;
+    int reads24h = ViewBag.ReadsLast24h as int? ?? 0;
+    int audit24h = ViewBag.AuditEventsLast24h as int? ?? 0;
+    int blockedUsers = ViewBag.BlockedUsers as int? ?? 0;
+    int twoFactorUsers = ViewBag.TwoFactorUsers as int? ?? 0;
+    int twoFactorStudents = ViewBag.TwoFactorStudents as int? ?? 0;
+    int activeSubscriptions = ViewBag.ActiveSubscriptions as int? ?? 0;
+    int pendingSubscriptions = ViewBag.PendingSubscriptions as int? ?? 0;
+    int booksRequiringSub = ViewBag.BooksRequiringSubscription as int? ?? 0;
+    int dbSizeMb = ViewBag.DbSizeMb as int? ?? 0;
+    var lastAudit = ViewBag.LastAudit as IEnumerable<LibraryMPT.Models.AuditLog> ?? Enumerable.Empty<LibraryMPT.Models.AuditLog>();
+    var popularAudit = ViewBag.AuditPopular as IEnumerable<LibraryMPT.Models.AuditSummaryDto> ?? Enumerable.Empty<LibraryMPT.Models.AuditSummaryDto>();
+}
+
+<div class="container fade-in">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+        <div class="mb-3 mb-md-0">
+            <h1 class="mb-2">
+                <i class="fas fa-tachometer-alt me-3"></i>Мониторинг безопасности и производительности
+            </h1>
+            <p class="lead text-muted mb-1">
+                Быстрый обзор состояния системы, активности пользователей и базовых метрик производительности
+            </p>
+            <p class="text-muted small mb-0">
+                Клиентские тесты времени ответа выполняются из браузера администратора и полезны для отладки в Dev.
+            </p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="@Url.Action("Index", "Admin")" class="btn btn-light-custom btn-custom">
+                <i class="fas fa-arrow-left me-1"></i>Назад в панель администратора
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-users fa-2x mb-2 text-primary-medium"></i>
+                <div class="stat-number">@totalUsers</div>
+                <div class="stat-label">Пользователей</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-book fa-2x mb-2 text-primary-medium"></i>
+                <div class="stat-number">@totalBooks</div>
+                <div class="stat-label">Книг в системе</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-download fa-2x mb-2 text-success"></i>
+                <div class="stat-number">@downloads24h</div>
+                <div class="stat-label">Загрузок за 24 часа</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-book-reader fa-2x mb-2 text-warning"></i>
+                <div class="stat-number">@reads24h</div>
+                <div class="stat-label">Чтений за 24 часа</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-user-lock fa-2x mb-2 text-danger"></i>
+                <div class="stat-number">@blockedUsers</div>
+                <div class="stat-label">Заблокированных пользователей</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-shield-alt fa-2x mb-2 text-success"></i>
+                <div class="stat-number">@twoFactorUsers</div>
+                <div class="stat-label">Пользователей с 2FA</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-user-graduate fa-2x mb-2 text-success"></i>
+                <div class="stat-number">@twoFactorStudents</div>
+                <div class="stat-label">Студентов с 2FA</div>
+            </div>
+        </div>
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-card text-center">
+                <i class="fas fa-database fa-2x mb-2 text-primary-medium"></i>
+                <div class="stat-number">@dbSizeMb МБ</div>
+                <div class="stat-label">Размер базы данных</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="custom-card h-100">
+                <div class="custom-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-stopwatch me-2"></i>Тест времени ответа страниц
+                    </h5>
+                    <button id="runPingTestsBtn" class="btn btn-sm btn-primary-custom">
+                        <i class="fas fa-play me-1"></i>Запустить тесты
+                    </button>
+                </div>
+                <div class="custom-card-body">
+                    <p class="text-muted small">
+                        Тест выполняет несколько запросов с клиента к ключевым страницам и считает среднее время ответа.
+                        Это полезно для локальной диагностики и проверки после изменений.
+                    </p>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0" id="pingResultsTable">
+                            <thead>
+                                <tr>
+                                    <th>Эндпоинт</th>
+                                    <th class="text-center">Попыток</th>
+                                    <th class="text-center">Среднее, мс</th>
+                                    <th class="text-center">Мин, мс</th>
+                                    <th class="text-center">Макс, мс</th>
+                                    <th class="text-center">Статус</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-muted text-center py-3">
+                                        Нажмите «Запустить тесты», чтобы измерить время ответа.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="custom-card h-100">
+                <div class="custom-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-clipboard-list me-2"></i>Последние события аудита (10)
+                    </h5>
+                </div>
+                <div class="custom-card-body">
+                    @if (!lastAudit.Any())
+                    {
+                        <p class="text-muted mb-0">События аудита за последние 24 часа отсутствуют.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Дата</th>
+                                        <th>Таблица</th>
+                                        <th>Действие</th>
+                                        <th>Пользователь</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var log in lastAudit)
+                                    {
+                                        <tr>
+                                            <td class="text-nowrap">@log.AuditDate.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                            <td>@log.TableName</td>
+                                            <td>
+                                                <span class="badge bg-secondary">@log.ActionType</span>
+                                            </td>
+                                            <td>@log.UserName</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3 text-end">
+                            <a href="@Url.Action("AuditLog", "Admin")" class="btn btn-link btn-sm">
+                                <i class="fas fa-external-link-alt me-1"></i>Открыть полный журнал
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-6">
+            <div class="custom-card h-100">
+                <div class="custom-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-chart-bar me-2"></i>Популярные действия / страницы (24 часа)
+                    </h5>
+                </div>
+                <div class="custom-card-body">
+                    @if (!popularAudit.Any())
+                    {
+                        <p class="text-muted mb-0">За последние 24 часа нет данных по действиям в журнале аудита.</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Таблица / область</th>
+                                        <th>Действие</th>
+                                        <th class="text-end">Событий</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in popularAudit)
+                                    {
+                                        <tr>
+                                            <td>@(string.IsNullOrEmpty(item.TableName) ? "(нет данных)" : item.TableName)</td>
+                                            <td>@(string.IsNullOrEmpty(item.ActionType) ? "(нет данных)" : item.ActionType)</td>
+                                            <td class="text-end">
+                                                <span class="badge bg-primary">@item.EventsCount</span>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="custom-card h-100">
+                <div class="custom-card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-server me-2"></i>Живые серверные метрики
+                    </h5>
+                    <span id="runtimeStatus" class="small text-muted">обновление...</span>
+                </div>
+                <div class="custom-card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-2">
+                            <tbody>
+                                <tr>
+                                    <th style="width: 40%;">Время сервера (МСК)</th>
+                                    <td id="metricServerTime" class="text-muted">—</td>
+                                </tr>
+                                <tr>
+                                    <th>Память процесса (Working Set)</th>
+                                    <td id="metricWorkingSet" class="text-muted">—</td>
+                                </tr>
+                                <tr>
+                                    <th>Память GC (TotalMemory)</th>
+                                    <td id="metricGcMemory" class="text-muted">—</td>
+                                </tr>
+                                <tr>
+                                    <th>PID процесса</th>
+                                    <td id="metricPid" class="text-muted">—</td>
+                                </tr>
+                                <tr>
+                                    <th>Время отправки последнего email</th>
+                                    <td id="metricEmailTime" class="text-muted">—</td>
+                                </tr>
+                                <tr>
+                                    <th>Последняя ошибка email</th>
+                                    <td id="metricEmailError" class="text-muted small">—</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Обновление каждые 5 секунд. Эти значения полезны для отладки и базового мониторинга,
+                        но не заменяют полноценные системы APM/логирования.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="custom-card mb-4">
+        <div class="custom-card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-vial me-2"></i>Быстрые тесты безопасности
+            </h5>
+        </div>
+        <div class="custom-card-body">
+            <p class="text-muted small mb-3">
+                Для детальных тестов используйте отдельную страницу
+                <strong>«Панель тестов безопасности (Dev)»</strong> из основной панели администратора.
+                Ниже — быстрые проверки доступности и базовых заголовков.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button id="quickSecurityTestBtn" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-shield-alt me-1"></i>Проверить заголовки /Home/Index
+                </button>
+                <span id="quickSecurityStatus" class="small text-muted"></span>
+            </div>
+
+            <pre id="quickSecurityDetails" class="bg-light p-2 small rounded mb-0" style="max-height: 200px; overflow:auto;"></pre>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const endpoints = [
+                { name: "Главная страница", path: "@Url.Content("~/Home/Index")" },
+                { name: "Каталог книг", path: "@Url.Content("~/Books/Index")" },
+                { name: "Каталог (клиент)", path: "@Url.Content("~/Client/Index")" },
+                { name: "Прочитанные книги", path: "@Url.Content("~/Client/Readed")" },
+                { name: "Вход", path: "@Url.Content("~/Account/Login")" },
+                { name: "Панель администратора", path: "@Url.Content("~/Admin/Index")" },
+                { name: "Панель мониторинга", path: "@Url.Content("~/Admin/SecurityDashboard")" },
+                { name: "Панель подписок", path: "@Url.Content("~/Subscription/Index")" }
+            ];
+
+            async function pingEndpoint(url, attempts = 3) {
+                const results = [];
+                for (let i = 0; i < attempts; i++) {
+                    const start = performance.now();
+                    try {
+                        const response = await fetch(url, { method: "GET", cache: "no-cache" });
+                        const end = performance.now();
+                        results.push({ ok: response.ok, status: response.status, duration: end - start });
+                    } catch (e) {
+                        const end = performance.now();
+                        results.push({ ok: false, status: 0, duration: end - start, error: e.message });
+                    }
+                }
+                return results;
+            }
+
+            function calcStats(measures) {
+                if (!measures.length) return null;
+                const durations = measures.map(m => m.duration);
+                const avg = durations.reduce((a, b) => a + b, 0) / durations.length;
+                const min = Math.min(...durations);
+                const max = Math.max(...durations);
+                const okCount = measures.filter(m => m.ok).length;
+                const allOk = okCount === measures.length;
+                return { avg, min, max, allOk, okCount, total: measures.length, lastStatus: measures[measures.length - 1].status };
+            }
+
+            function renderPingRow(tbody, endpointName, url, stats) {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+                    <td>
+                        <div class="fw-semibold">${endpointName}</div>
+                        <div class="small text-muted">${url}</div>
+                    </td>
+                    <td class="text-center">${stats.total}</td>
+                    <td class="text-center">${stats.avg.toFixed(1)}</td>
+                    <td class="text-center">${stats.min.toFixed(1)}</td>
+                    <td class="text-center">${stats.max.toFixed(1)}</td>
+                    <td class="text-center">
+                        <span class="badge ${stats.allOk ? "bg-success" : "bg-warning"}">
+                            ${stats.allOk ? "OK" : "Проблемы"} (HTTP ${stats.lastStatus || "n/a"})
+                        </span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            async function runPingTests() {
+                const table = document.getElementById("pingResultsTable");
+                const tbody = table.querySelector("tbody");
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-muted text-center py-3">
+                            Выполняются тесты, подождите...
+                        </td>
+                    </tr>`;
+
+                const baseUrl = window.location.origin;
+                const results = [];
+
+                for (const ep of endpoints) {
+                    const url = ep.path.startsWith("http") ? ep.path : (baseUrl + ep.path);
+                    const measures = await pingEndpoint(url, 3);
+                    const stats = calcStats(measures);
+                    if (stats) {
+                        results.push({ endpoint: ep, url, stats });
+                    }
+                }
+
+                tbody.innerHTML = "";
+                if (!results.length) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="6" class="text-muted text-center py-3">
+                                Не удалось выполнить тесты.
+                            </td>
+                        </tr>`;
+                    return;
+                }
+
+                for (const r of results) {
+                    renderPingRow(tbody, r.endpoint.name, r.url, r.stats);
+                }
+            }
+
+            async function runQuickSecurityTest() {
+                const statusEl = document.getElementById("quickSecurityStatus");
+                const detailsEl = document.getElementById("quickSecurityDetails");
+                statusEl.textContent = "Выполняется запрос...";
+                detailsEl.textContent = "";
+
+                const url = "@Url.Content("~/Home/Index")";
+                try {
+                    const response = await fetch(url, { method: "GET", cache: "no-cache" });
+                    statusEl.textContent = `HTTP ${response.status} ${response.ok ? "(OK)" : "(ошибка)"}`;
+
+                    const csp = response.headers.get("Content-Security-Policy");
+                    const xfo = response.headers.get("X-Frame-Options");
+                    const xcto = response.headers.get("X-Content-Type-Options");
+                    const xxss = response.headers.get("X-XSS-Protection");
+                    const referrer = response.headers.get("Referrer-Policy");
+
+                    const lines = [];
+                    lines.push(`URL: ${url}`);
+                    lines.push(`Status: ${response.status}`);
+                    lines.push("");
+                    lines.push("Security headers:");
+                    lines.push(`Content-Security-Policy: ${csp || "(нет)"}`);
+                    lines.push(`X-Frame-Options: ${xfo || "(нет)"}`);
+                    lines.push(`X-Content-Type-Options: ${xcto || "(нет)"}`);
+                    lines.push(`X-XSS-Protection: ${xxss || "(нет)"}`);
+                    lines.push(`Referrer-Policy: ${referrer || "(нет)"}`);
+
+                    detailsEl.textContent = lines.join("\n");
+                } catch (e) {
+                    statusEl.textContent = "Ошибка при выполнении запроса";
+                    detailsEl.textContent = `Ошибка: ${e.message || e}`;
+                }
+            }
+
+            document.getElementById("runPingTestsBtn")?.addEventListener("click", runPingTests);
+            document.getElementById("quickSecurityTestBtn")?.addEventListener("click", runQuickSecurityTest);
+
+            async function updateRuntimeMetrics() {
+                const statusEl = document.getElementById("runtimeStatus");
+                const elServerTime = document.getElementById("metricServerTime");
+                const elWs = document.getElementById("metricWorkingSet");
+                const elGc = document.getElementById("metricGcMemory");
+                const elPid = document.getElementById("metricPid");
+                const elEmailTime = document.getElementById("metricEmailTime");
+                const elEmailError = document.getElementById("metricEmailError");
+
+                try {
+                    const response = await fetch("@Url.Action("RuntimeMetrics", "Admin")", { cache: "no-cache" });
+                    if (!response.ok) {
+                        statusEl.textContent = "ошибка HTTP " + response.status;
+                        return;
+                    }
+                    const data = await response.json();
+
+                    statusEl.textContent = "обновлено";
+
+                    // Переводим серверное время в московский часовой пояс (Europe/Moscow)
+                    let serverTimeMsk = "—";
+                    if (data.serverTimeUtc) {
+                        const utcDate = new Date(data.serverTimeUtc);
+                        try {
+                            serverTimeMsk = utcDate.toLocaleString("ru-RU", {
+                                timeZone: "Europe/Moscow",
+                                hour12: false
+                            });
+                        } catch {
+                            // Фоллбек: просто добавляем +3 часа к UTC
+                            const mskMs = utcDate.getTime() + 3 * 60 * 60 * 1000;
+                            const mskDate = new Date(mskMs);
+                            const yyyy = mskDate.getFullYear();
+                            const mm = String(mskDate.getMonth() + 1).padStart(2, "0");
+                            const dd = String(mskDate.getDate()).padStart(2, "0");
+                            const hh = String(mskDate.getHours()).padStart(2, "0");
+                            const mi = String(mskDate.getMinutes()).padStart(2, "0");
+                            const ss = String(mskDate.getSeconds()).padStart(2, "0");
+                            serverTimeMsk = `${dd}.${mm}.${yyyy} ${hh}:${mi}:${ss}`;
+                        }
+                    }
+                    elServerTime.textContent = serverTimeMsk;
+
+                    function formatBytes(bytes) {
+                        if (!bytes || bytes <= 0) return "0 Б";
+                        const units = ["Б", "КБ", "МБ", "ГБ"];
+                        let i = 0;
+                        let value = bytes;
+                        while (value >= 1024 && i < units.length - 1) {
+                            value /= 1024;
+                            i++;
+                        }
+                        return value.toFixed(1) + " " + units[i];
+                    }
+
+                    elWs.textContent = formatBytes(data.workingSetBytes || 0);
+                    elGc.textContent = formatBytes(data.gcTotalMemoryBytes || 0);
+                    elPid.textContent = data.processId || "—";
+
+                    if (data.emailLastDurationMs && data.emailLastSendUtc) {
+                        const emailTime = new Date(data.emailLastSendUtc).toISOString().replace("T", " ").replace("Z", "");
+                        elEmailTime.textContent = `${data.emailLastDurationMs} мс (отправлено: ${emailTime})`;
+                    } else {
+                        elEmailTime.textContent = "данных пока нет";
+                    }
+
+                    elEmailError.textContent = data.emailLastError || "—";
+                } catch (e) {
+                    statusEl.textContent = "ошибка связи";
+                }
+            }
+
+            // Первичное обновление и затем каждые 5 секунд
+            updateRuntimeMetrics();
+            setInterval(updateRuntimeMetrics, 5000);
+        })();
+    </script>
+}
+
+@section Styles {
+    <style>
+        .stat-card {
+            background: white;
+            border-radius: 14px;
+            padding: 1.4rem 1.2rem;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+        }
+
+        .stat-number {
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+    </style>
+}
+
+

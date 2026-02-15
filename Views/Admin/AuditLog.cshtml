@@ -1,0 +1,185 @@
+﻿@model List<LibraryMPT.Models.AuditLog>
+
+@{
+    ViewBag.Title = "Журнал аудита";
+    Layout = "_Layout";
+    string? actionType = ViewBag.ActionType as string;
+    string? search = ViewBag.Search as string;
+    string sortBy = ViewBag.SortBy as string ?? "date";
+    string sortDir = ViewBag.SortDir as string ?? "desc";
+}
+
+<style>
+    .audit-data {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 14px;
+        font-family: Consolas, monospace;
+        font-size: 14px;
+        white-space: pre-wrap;
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    .audit-label {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+</style>
+
+<h2 class="mb-4">📋 Журнал аудита</h2>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+    <a asp-action="Index" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left me-1"></i> Назад к панели
+    </a>
+    
+    <form asp-action="ClearAuditLogs" method="post"
+          onsubmit="return confirm('Вы уверены, что хотите удалить ВСЕ логи?');">
+        @Html.AntiForgeryToken()
+        <button class="btn btn-danger">
+            <i class="fas fa-trash me-1"></i> Очистить все логи
+        </button>
+    </form>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Поиск</label>
+                <input type="text"
+                       name="search"
+                       class="form-control"
+                       value="@search"
+                       placeholder="Таблица, действие, пользователь..." />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Тип действия</label>
+                <select name="actionType" class="form-select">
+                    <option value="">Все</option>
+                    <option value="INSERT" selected="@(actionType == "INSERT")">INSERT</option>
+                    <option value="UPDATE" selected="@(actionType == "UPDATE")">UPDATE</option>
+                    <option value="DELETE" selected="@(actionType == "DELETE")">DELETE</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Сортировка</label>
+                <select name="sortBy" class="form-select">
+                    <option value="date" selected="@(sortBy == "date")">Дата</option>
+                    <option value="table" selected="@(sortBy == "table")">Таблица</option>
+                    <option value="action" selected="@(sortBy == "action")">Действие</option>
+                    <option value="user" selected="@(sortBy == "user")">Пользователь</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Направление</label>
+                <select name="sortDir" class="form-select">
+                    <option value="desc" selected="@(sortDir == "desc")">По убыванию</option>
+                    <option value="asc" selected="@(sortDir == "asc")">По возрастанию</option>
+                </select>
+            </div>
+            <div class="col-12 d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search"></i> Применить
+                </button>
+                <a asp-action="AuditLog" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> Сброс
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+@functions {
+    string GetActionClass(string? action)
+    {
+        return action switch
+        {
+            "INSERT" => "badge bg-success",
+            "UPDATE" => "badge bg-warning text-dark",
+            "DELETE" => "badge bg-danger",
+            _ => "badge bg-secondary"
+        };
+    }
+}
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-light">
+            <tr>
+                <th>Дата</th>
+                <th>Таблица</th>
+                <th>Действие</th>
+                <th>Пользователь</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var log in Model)
+            {
+                var modalId = $"auditModal_{log.AuditLogID}";
+                <tr>
+                    <td>@log.AuditDate.ToString("dd.MM.yyyy HH:mm")</td>
+                    <td>@log.TableName</td>
+                    <td>
+                        <span class="@GetActionClass(log.ActionType)">
+                            @log.ActionType
+                        </span>
+                    </td>
+                    <td>@log.UserName</td>
+                    <td class="text-end">
+                        <button class="btn btn-outline-primary btn-sm"
+                                data-bs-toggle="modal"
+                                data-bs-target="#@modalId">
+                            Подробнее
+                        </button>
+                    </td>
+                </tr>
+
+                <div class="modal fade" id="@modalId" tabindex="-1">
+                    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">
+                                    🛠 @log.ActionType — @log.TableName
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+
+                            <div class="modal-body">
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <div class="audit-label">Старые данные</div>
+                                        <div class="audit-data">
+                                            @(string.IsNullOrWhiteSpace(log.OldData)
+                                                                                    ? "—"
+                                                                                    : log.OldData)
+                                                                                              </div>
+                                                                                          </div>
+
+                                    <div class="col-md-6">
+                                        <div class="audit-label">Новые данные</div>
+                                        <div class="audit-data">
+                                            @(string.IsNullOrWhiteSpace(log.NewData)
+                                                                                    ? "—"
+                                                                                    : log.NewData)
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" data-bs-dismiss="modal">
+                                    Закрыть
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                        }
+        </tbody>
+    </table>
+</div>

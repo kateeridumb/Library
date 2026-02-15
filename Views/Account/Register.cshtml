@@ -1,0 +1,102 @@
+﻿@{
+    ViewBag.Title = "Регистрация";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in d-flex justify-content-center align-items-center" style="min-height: 85vh;">
+    <div class="custom-card" style="max-width: 520px; width: 100%;">
+        <div class="custom-card-header text-center"
+             style="background: linear-gradient(135deg, #2ECC71 0%, #58D68D 100%);">
+            <h4 class="mb-0">
+                <i class="fas fa-user-plus me-2"></i>Регистрация в LibraryMPT
+            </h4>
+        </div>
+
+        <div class="custom-card-body">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="text-danger mb-3">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>
+                            <i class="fas fa-times-circle me-1"></i>@error.ErrorMessage
+                        </div>
+                    }
+                </div>
+            }
+
+
+            <form method="post">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Имя</label>
+                        <input name="firstName"
+                               class="form-control rounded-xl"
+                               required />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Фамилия</label>
+                        <input name="lastName"
+                               class="form-control rounded-xl"
+                               required />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email"
+                           name="email"
+                           class="form-control rounded-xl"
+                           required />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Логин</label>
+                    <input name="username"
+                           class="form-control rounded-xl"
+                           required />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Роль</label>
+                    <input class="form-control rounded-xl" value="Студент" disabled />
+                    <div class="form-text">Роль назначается автоматически.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Пароль</label>
+                    <input type="password"
+                           name="password"
+                           class="form-control rounded-xl"
+                           required />
+                </div>
+
+                <div class="form-check mb-4">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           id="personalDataConsent"
+                           name="personalDataConsent"
+                           value="true"
+                           required />
+                    <label class="form-check-label" for="personalDataConsent">
+                        Согласен(на) на обработку персональных данных и условия
+                        <a href="@Url.Action("Privacy", "Home")" target="_blank">политики конфиденциальности</a>
+                    </label>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-success-custom btn-custom w-100 mb-3">
+                    <i class="fas fa-user-check me-2"></i>Создать аккаунт
+                </button>
+            </form>
+
+            <div class="text-center">
+                <a href="@Url.Action("Login", "Account")"
+                   class="btn btn-link">
+                    <i class="fas fa-arrow-left me-1"></i>Уже есть аккаунт
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

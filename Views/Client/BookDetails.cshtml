@@ -1,0 +1,250 @@
+@model LibraryMPT.Models.Book
+
+@{
+    ViewData["Title"] = Model.Title;
+    var hasSubscription = ViewBag.HasSubscription ?? false;
+    var requiresSubscription = Model.RequiresSubscription;
+    var canDownload = !requiresSubscription || hasSubscription;
+    var isGuest = User.IsInRole("Guest");
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+                    <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+                    <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+                <div class="row g-0">
+                    
+                    
+                    <div class="col-md-4 position-relative">
+                        <div class="book-cover-container h-100" style="min-height: 450px;">
+                            @if (!string.IsNullOrEmpty(Model.ImagePath))
+                            {
+                                <img src="@Model.ImagePath" 
+                                     alt="@Model.Title" 
+                                     class="w-100 h-100 object-fit-cover" />
+                            }
+                            else
+                            {
+                                <div class="w-100 h-100 d-flex align-items-center justify-content-center"
+                                     style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                    <div class="text-center text-white p-4">
+                                        <i class="fas fa-book fa-5x mb-3 opacity-75"></i>
+                                        <h5 class="mb-0">@Model.Title</h5>
+                                    </div>
+                                </div>
+                            }
+                            
+                            @if (requiresSubscription)
+                            {
+                                <div class="position-absolute top-0 end-0 m-3">
+                                    <span class="badge bg-warning text-dark px-3 py-2 shadow">
+                                        <i class="fas fa-crown me-1"></i> Премиум
+                                    </span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    
+                    <div class="col-md-8">
+                        <div class="card-body p-4 p-lg-5">
+                            
+                            
+                            <div class="mb-4">
+                                <h1 class="fw-bold mb-2" style="color: var(--primary-dark, #2c3e50);">
+                                    @Model.Title
+                                </h1>
+                                <h5 class="text-muted">
+                                    <i class="fas fa-user-pen me-2"></i>
+                                    @(Model.Author != null ? $"{Model.Author.FirstName} {Model.Author.LastName}" : "Автор неизвестен")
+                                </h5>
+                            </div>
+
+                            
+                            <div class="d-flex flex-wrap gap-2 mb-4">
+                                @if (Model.Category != null)
+                                {
+                                    <span class="badge rounded-pill px-3 py-2" 
+                                          style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                                        <i class="fas fa-folder me-1"></i> @Model.Category.CategoryName
+                                    </span>
+                                }
+                                
+                                @if (Model.Publisher != null)
+                                {
+                                    <span class="badge rounded-pill bg-secondary px-3 py-2">
+                                        <i class="fas fa-building me-1"></i> @Model.Publisher.PublisherName
+                                    </span>
+                                }
+                                
+                                @if (Model.PublishYear.HasValue)
+                                {
+                                    <span class="badge rounded-pill bg-info text-dark px-3 py-2">
+                                        <i class="fas fa-calendar me-1"></i> @Model.PublishYear
+                                    </span>
+                                }
+                            </div>
+
+                            
+                            <div class="mb-4">
+                                <h6 class="fw-bold text-uppercase text-muted mb-3">
+                                    <i class="fas fa-align-left me-2"></i>Описание
+                                </h6>
+                                <div class="p-3 rounded-3" style="background: #f8f9fa;">
+                                    @if (string.IsNullOrWhiteSpace(Model.Description))
+                                    {
+                                        <p class="text-muted fst-italic mb-0">
+                                            Описание отсутствует
+                                        </p>
+                                    }
+                                    else
+                                    {
+                                        <p class="mb-0" style="line-height: 1.8;">
+                                            @Model.Description
+                                        </p>
+                                    }
+                                </div>
+                            </div>
+
+                            
+                            @if (requiresSubscription && !hasSubscription)
+                            {
+                                <div class="alert alert-warning d-flex align-items-center mb-4" role="alert">
+                                    <i class="fas fa-info-circle fa-lg me-3"></i>
+                                    <div>
+                                        <strong>Эта книга доступна по подписке</strong><br>
+                                        <small>Обратитесь к администратору для получения доступа</small>
+                                    </div>
+                                </div>
+                            }
+
+                            
+                            <div class="d-flex flex-wrap gap-3 mt-4 pt-3 border-top">
+                                @if (!string.IsNullOrEmpty(Model.FilePath))
+                                {
+                                    if (canDownload)
+                                    {
+                                        <a asp-controller="Client"
+                                           asp-action="ReadOnline"
+                                           asp-route-id="@Model.BookID"
+                                           class="btn btn-lg px-4"
+                                           style="background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white;">
+                                            <i class="fas fa-book-open me-2"></i>Читать онлайн
+                                        </a>
+
+                                        @if (!requiresSubscription)
+                                        {
+                                            if (!isGuest)
+                                            {
+                                                <a asp-controller="Client"
+                                                   asp-action="Download"
+                                                   asp-route-id="@Model.BookID"
+                                                   class="btn btn-lg px-4"
+                                                   style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                                    <i class="fas fa-download me-2"></i>Скачать книгу
+                                                </a>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-lg btn-secondary px-4" disabled title="Скачивание недоступно для гостя">
+                                                    <i class="fas fa-download me-2"></i>Скачивание недоступно
+                                                </button>
+                                            }
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-lg btn-secondary px-4" disabled title="Книги, доступные по подписке, можно только читать онлайн">
+                                                <i class="fas fa-download me-2"></i>Скачивание недоступно
+                                            </button>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-lg btn-secondary px-4" disabled>
+                                            <i class="fas fa-lock me-2"></i>Доступ по подписке
+                                        </button>
+                                    }
+                                }
+
+                                @if (!isGuest)
+                                {
+                                    <form asp-controller="Client" asp-action="MarkAsRead" method="post" class="d-inline">
+                                        <input type="hidden" name="bookId" value="@Model.BookID" />
+                                        <button type="submit" class="btn btn-lg btn-outline-success px-4">
+                                            <i class="fas fa-check-circle me-2"></i>Отметить прочитанным
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                
+                <div class="card-footer bg-light p-3 d-flex justify-content-between align-items-center">
+                    <a asp-controller="Client" asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Назад к каталогу
+                    </a>
+                    <span class="text-muted small">
+                        <i class="fas fa-hashtag me-1"></i>ID: @Model.BookID
+                    </span>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .book-cover-container img {
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        
+        .book-cover-container:hover img {
+            transform: scale(1.02);
+        }
+        
+        .card {
+            transition: box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            box-shadow: 0 25px 80px rgba(0,0,0,0.12) !important;
+        }
+        
+        .btn {
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+        }
+
+        .object-fit-cover {
+            object-fit: cover;
+        }
+    </style>
+}
+

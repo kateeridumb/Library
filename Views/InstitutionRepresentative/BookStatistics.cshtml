@@ -1,0 +1,179 @@
+@model List<LibraryMPT.Models.BookStatisticsDto>
+
+@{
+    ViewBag.Title = "Статистика книг";
+    Layout = "_Layout";
+    string? search = ViewBag.Search as string;
+    string sortBy = ViewBag.SortBy as string ?? "downloads";
+    string sortDir = ViewBag.SortDir as string ?? "desc";
+}
+
+<div class="container fade-in">
+    
+    <div class="page-header-modern mb-5">
+        <div class="header-content">
+            <h1 class="page-title">
+                <i class="fas fa-book me-3"></i>Статистика книг
+            </h1>
+            <p class="page-subtitle">Популярность книг среди студентов вашего учебного заведения</p>
+        </div>
+        <a asp-action="Index" class="btn btn-back">
+            <i class="fas fa-arrow-left me-2"></i>Назад
+        </a>
+    </div>
+
+    @if (ViewBag.Faculty != null)
+    {
+        <div class="faculty-info-card mb-4">
+            <i class="fas fa-university"></i>
+            <div>
+                <strong>Учебное заведение</strong>
+                <p class="mb-0">@ViewBag.Faculty.FacultyName</p>
+            </div>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="fas fa-book-open"></i>
+            <h4>Нет статистики по книгам</h4>
+            <p>Нет данных о популярности книг для вашего учебного заведения</p>
+        </div>
+    }
+    else
+    {
+        
+        <div class="summary-stats mb-5">
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern blue">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Sum(b => b.TotalDownloads)</div>
+                    <div class="stat-label">Всего скачиваний</div>
+                </div>
+            </div>
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern green">
+                    <i class="fas fa-book-reader"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Sum(b => b.TotalReads)</div>
+                    <div class="stat-label">Всего прочтений</div>
+                </div>
+            </div>
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern purple">
+                    <i class="fas fa-book"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Count</div>
+                    <div class="stat-label">Популярных книг</div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" class="form-control"
+                               value="@search" placeholder="Название книги">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Сортировка</label>
+                        <select name="sortBy" class="form-select">
+                            <option value="downloads" selected="@(sortBy == "downloads")">Скачивания</option>
+                            <option value="reads" selected="@(sortBy == "reads")">Прочтения</option>
+                            <option value="unique" selected="@(sortBy == "unique")">Уникальные скачивания</option>
+                            <option value="title" selected="@(sortBy == "title")">Название</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Направление</label>
+                        <select name="sortDir" class="form-select">
+                            <option value="desc" selected="@(sortDir == "desc")">По убыванию</option>
+                            <option value="asc" selected="@(sortDir == "asc")">По возрастанию</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Применить
+                        </button>
+                        <a asp-action="BookStatistics" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Сброс
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-header">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Рейтинг популярности книг</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Название книги</th>
+                            <th class="text-center">Скачиваний</th>
+                            <th class="text-center">Прочтений</th>
+                            <th class="text-center">Уникальных скачиваний</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var book in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="book-info">
+                                        <div class="book-icon">
+                                            <i class="fas fa-book"></i>
+                                        </div>
+                                        <strong>@book.Title</strong>
+                                    </div>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge downloads">@book.TotalDownloads</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge reads">@book.TotalReads</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge books">@book.UniqueDownloaders</span>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@section Styles {
+    <style>
+        .book-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .book-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+    </style>
+}
+

@@ -1,0 +1,98 @@
+@model StaffCreateDto
+
+<h2>Добавить сотрудника</h2>
+
+<form asp-action="CreateStaff" method="post">
+    @Html.AntiForgeryToken()
+
+    <div class="mb-3">
+        <label>Имя</label>
+        <input asp-for="FirstName" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Фамилия</label>
+        <input asp-for="LastName" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Email</label>
+        <input asp-for="Email" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Логин</label>
+        <input asp-for="Username" class="form-control" />
+    </div>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Пароль будет сгенерирован автоматически</strong> и отправлен на указанный email после создания аккаунта.
+    </div>
+
+    <div class="mb-3">
+        <label>Роль</label>
+        <select asp-for="RoleID" class="form-select" id="roleSelect">
+            @foreach (var r in ViewBag.Roles)
+            {
+                <option value="@r.RoleID">@r.RoleName</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3" id="facultyGroup" style="display: none;">
+        <label>Учебное заведение <span class="text-danger">*</span></label>
+        <select asp-for="FacultyID" class="form-select">
+            <option value="">— Выберите учебное заведение —</option>
+            @if (ViewBag.Faculties != null)
+            {
+                @foreach (var faculty in ViewBag.Faculties)
+                {
+                    <option value="@faculty.FacultyID">@faculty.FacultyName</option>
+                }
+            }
+        </select>
+        <small class="form-text text-muted">
+            Обязательно для представителя учебного заведения
+        </small>
+    </div>
+
+    @if (!ViewData.ModelState.IsValid)
+    {
+        <div class="alert alert-danger">
+            @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+            {
+                <div>@error.ErrorMessage</div>
+            }
+        </div>
+    }
+
+    <button class="btn btn-success">? Добавить</button>
+    <a asp-action="UserManagement" class="btn btn-secondary">Назад</a>
+</form>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const roleSelect = document.getElementById('roleSelect');
+            const facultyGroup = document.getElementById('facultyGroup');
+            
+            function toggleFacultyField() {
+                const selectedRoleText = roleSelect.options[roleSelect.selectedIndex].text;
+
+
+                if (selectedRoleText === 'InstitutionRepresentative') {
+                    facultyGroup.style.display = 'block';
+                    facultyGroup.querySelector('select').required = true;
+                } else {
+                    facultyGroup.style.display = 'none';
+                    facultyGroup.querySelector('select').required = false;
+                    facultyGroup.querySelector('select').value = '';
+                }
+            }
+            
+            roleSelect.addEventListener('change', toggleFacultyField);
+            toggleFacultyField(); // Проверяем при загрузке страницы
+        });
+    </script>
+}

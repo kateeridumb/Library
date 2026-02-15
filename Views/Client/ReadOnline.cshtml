@@ -1,0 +1,1827 @@
+@model LibraryMPT.Models.Book
+
+@{
+    ViewData["Title"] = $"Чтение: {Model.Title}";
+    var canRead = ViewBag.CanRead ?? false;
+    var hasSubscription = ViewBag.HasSubscription ?? false;
+    var fileType = ViewBag.FileType ?? "unknown";
+    var fileUrl = ViewBag.FileUrl ?? "";
+    var bookId = Model.BookID;
+}
+
+<div class="container-fluid p-0 reader-wrapper" id="readerWrapper">
+    
+    <div class="reader-header">
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center py-2 px-3">
+                <div class="d-flex align-items-center gap-3">
+                    <a asp-controller="Client" asp-action="BookDetails" asp-route-id="@Model.BookID" 
+                       class="btn btn-outline-light btn-sm">
+                        <i class="fas fa-arrow-left me-2"></i>Назад
+                    </a>
+                    <div>
+                        <h6 class="text-white mb-0">@Model.Title</h6>
+                        @if (Model.Author != null)
+                        {
+                            <small class="text-white-50">@Model.Author.FirstName @Model.Author.LastName</small>
+                        }
+                    </div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                    
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-light btn-sm" id="fontSizeDecrease" title="Уменьшить размер">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-sm" id="fontSizeReset" title="Сбросить размер">
+                            <i class="fas fa-text-height"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-light btn-sm" id="fontSizeIncrease" title="Увеличить размер">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    
+                    <select class="form-select form-select-sm reader-font-select" id="fontFamilySelect" title="Шрифт">
+                        <option value="serif">Serif</option>
+                        <option value="sans">Sans</option>
+                        <option value="mono">Mono</option>
+                    </select>
+                    
+                    <button class="btn btn-outline-light btn-sm" id="themeToggle" title="Переключить тему">
+                        <i class="fas fa-moon" id="themeIcon"></i>
+                    </button>
+                    
+                    <div class="reader-search input-group input-group-sm" id="readerSearch">
+                        <input type="text" class="form-control" id="bookSearchInput" placeholder="Поиск по книге">
+                        <button class="btn btn-outline-light" id="bookSearchPrev" title="Назад">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                        <button class="btn btn-outline-light" id="bookSearchNext" title="Вперед">
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <button class="btn btn-outline-light" id="bookSearchClear" title="Очистить">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <button class="btn btn-outline-light btn-sm" id="bookmarksToggle" title="Закладки">
+                        <i class="fas fa-bookmark"></i>
+                        <span class="badge bg-danger ms-1" id="bookmarkCount" style="display: none;">0</span>
+                    </button>
+                    
+                    <button class="btn btn-outline-light btn-sm" id="addBookmarkBtn" title="Добавить закладку">
+                        <i class="fas fa-bookmark-plus"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="bookmarks-sidebar" id="bookmarksSidebar">
+        <div class="bookmarks-header">
+            <div>
+                <h5 class="mb-0">Закладки</h5>
+                <div class="bookmarks-hint">Выделите текст и нажмите “Закладка”.</div>
+            </div>
+            <button class="btn btn-sm btn-close" id="closeBookmarks"></button>
+        </div>
+        <div class="bookmarks-search">
+            <input type="text" class="form-control form-control-sm" id="bookmarkSearchInput" placeholder="Поиск по закладкам">
+        </div>
+        <div class="bookmarks-list" id="bookmarksList">
+            <div class="text-center text-muted p-3">
+                <i class="fas fa-spinner fa-spin"></i> Загрузка...
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="reader-container" id="readerContainer">
+        @if (!canRead)
+        {
+            <div class="reader-blocked">
+                <div class="blocked-content">
+                    <i class="fas fa-lock fa-4x mb-4 text-warning"></i>
+                    <h3>Доступ ограничен</h3>
+                    <p class="text-muted mb-4">
+                        Эта книга доступна только по подписке. Обратитесь к администратору для получения доступа.
+                    </p>
+                    <a asp-controller="Client" asp-action="BookDetails" asp-route-id="@Model.BookID" 
+                       class="btn btn-primary">
+                        <i class="fas fa-arrow-left me-2"></i>Вернуться к книге
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="reader-content" id="readerContent">
+                <div class="alert alert-warning reader-alert" id="readerAlert" style="display: none;"></div>
+                @if (string.IsNullOrWhiteSpace(Model.FilePath))
+                {
+                    <div class="feature-coming-soon">
+                        <div class="coming-soon-icon">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <h3 class="mb-3">Файл не найден</h3>
+                        <p class="text-muted mb-4">
+                            Файл книги недоступен для чтения онлайн.
+                        </p>
+                        <a asp-controller="Client" asp-action="BookDetails" asp-route-id="@Model.BookID" 
+                           class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-arrow-left me-2"></i>Назад
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <div class="book-viewer" id="bookViewer">
+                        @if (fileType == "pdf")
+                        {
+                            <div id="pdfViewer" class="pdf-viewer"></div>
+                        }
+                        else if (fileType == "epub")
+                        {
+                            <div id="epubViewer" class="epub-viewer"></div>
+                        }
+                        else if (fileType == "text" || fileType == "fb2")
+                        {
+                            <div id="textViewer" class="text-viewer">
+                                <div id="textContent" class="text-content"></div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="unsupported-format">
+                                <i class="fas fa-file-alt fa-4x mb-4 text-muted"></i>
+                                <h3>Формат не поддерживается для чтения онлайн</h3>
+                                <p class="text-muted">Пожалуйста, скачайте файл для просмотра.</p>
+                                <a asp-controller="Client" asp-action="BookDetails" asp-route-id="@Model.BookID" 
+                                   class="btn btn-primary">
+                                    <i class="fas fa-arrow-left me-2"></i>Назад
+                                </a>
+                            </div>
+                        }
+                        <div class="selection-toolbar" id="selectionToolbar">
+                            <button type="button" class="selection-toolbar-btn" id="selectionBookmarkBtn">
+                                <i class="fas fa-bookmark"></i> Закладка
+                            </button>
+                        </div>
+                    </div>
+                    <div class="reader-hint" id="readerHint">
+                        Выделите текст, чтобы быстро добавить закладку.
+                    </div>
+                    <div class="reader-footer" id="readerFooter">
+                        <button class="btn btn-outline-secondary btn-sm reader-page-btn" id="prevPageBtn" title="Предыдущая страница">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <div class="reader-page-indicator" id="pageIndicator">Страница —</div>
+                        <button class="btn btn-outline-secondary btn-sm reader-page-btn" id="nextPageBtn" title="Следующая страница">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+
+<div class="modal fade" id="addBookmarkModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить закладку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bookmarkForm">
+                    <input type="hidden" id="bookmarkId" name="bookmarkId" value="0">
+                    <input type="hidden" id="bookmarkBookId" name="bookID" value="@bookId">
+                    <div class="mb-3">
+                        <label for="bookmarkTitle" class="form-label">Название</label>
+                        <input type="text" class="form-control" id="bookmarkTitle" name="title" placeholder="Например: Глава 3" maxlength="200">
+                    </div>
+                    <div class="mb-3">
+                        <label for="bookmarkPage" class="form-label">Страница/Прогресс</label>
+                        <input type="text" class="form-control" id="bookmarkPage" name="page" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bookmarkPosition" class="form-label">Позиция</label>
+                        <input type="text" class="form-control" id="bookmarkPosition" name="position" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="bookmarkNote" class="form-label">Заметка</label>
+                        <textarea class="form-control" id="bookmarkNote" name="note" rows="3" placeholder="Ваша заметка к закладке"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveBookmarkBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+
+
+
+
+        }
+
+        .reader-wrapper {
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background: #f4f6fb;
+        }
+
+        .reader-header {
+            background: linear-gradient(135deg, #0f4c5c 0%, #1b6b7a 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 6px 18px rgba(15, 76, 92, 0.2);
+            flex-shrink: 0;
+        }
+
+        .reader-font-select {
+            width: 110px;
+            border-radius: 999px;
+        }
+
+        .reader-header .d-flex {
+            flex-wrap: wrap;
+            row-gap: 0.5rem;
+        }
+
+        .reader-header .btn,
+        .reader-header .form-select {
+            height: 34px;
+            line-height: 1;
+        }
+
+        .reader-header .btn {
+            border-radius: 10px;
+        }
+
+        .reader-header .form-select {
+            border-radius: 10px;
+            min-width: 110px;
+        }
+
+        .reader-search .form-control {
+            min-width: 180px;
+            border-radius: 999px 0 0 999px;
+        }
+
+        .reader-search .btn {
+            border-radius: 0;
+        }
+
+        .reader-search .btn:last-child {
+            border-radius: 0 999px 999px 0;
+        }
+
+        .reader-container {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+        }
+
+        .reader-container.with-sidebar {
+            margin-right: 360px;
+            transition: margin-right 0.3s ease;
+        }
+
+        .reader-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 16px 20px 20px;
+        }
+
+        .reader-alert {
+            margin: 0 0 12px 0;
+            border-radius: 12px;
+        }
+
+        .book-viewer {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .reader-hint {
+            margin-top: 6px;
+            font-size: 0.85rem;
+            color: #6b7280;
+            text-align: center;
+        }
+
+        .selection-toolbar {
+            position: absolute;
+            display: none;
+            z-index: 20;
+            background: #0f4c5c;
+            color: #fff;
+            border-radius: 999px;
+            padding: 6px 10px;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+        }
+
+        .selection-toolbar-btn {
+            background: transparent;
+            border: 0;
+            color: inherit;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .reader-footer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 12px 0 4px;
+            color: #445;
+            font-weight: 600;
+        }
+
+        .reader-page-indicator {
+            min-width: 160px;
+            text-align: center;
+            padding: 6px 12px;
+            background: #ffffff;
+            border-radius: 999px;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+        }
+
+        .reader-page-btn {
+            border-radius: 12px;
+            min-width: 36px;
+        }
+
+        .reader-mark {
+            background: #ffe58f;
+            padding: 0 2px;
+            border-radius: 4px;
+        }
+
+        
+        .pdf-viewer {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background: var(--reader-bg-light);
+            border-radius: 16px;
+        }
+
+        .pdf-viewer canvas {
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        
+        .epub-viewer {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            padding: 0;
+            background: var(--reader-bg-light);
+            font-size: var(--reader-font-size);
+            line-height: 1.6;
+            color: var(--reader-text-light);
+            position: relative;
+            border-radius: 16px;
+        }
+
+        .epub-viewer.dark-theme {
+            background: var(--reader-bg-dark);
+            color: var(--reader-text-dark);
+        }
+
+        .epub-viewer iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+        
+        .text-viewer {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            padding: 20px;
+            background: var(--reader-bg-light);
+            font-size: var(--reader-font-size);
+            line-height: 1.6;
+            color: var(--reader-text-light);
+            border-radius: 16px;
+        }
+
+        .text-content {
+            max-width: 860px;
+            margin: 0 auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Georgia', 'Times New Roman', serif;
+        }
+
+        .text-content.fb2-content {
+            white-space: normal;
+            line-height: 1.7;
+        }
+
+        .text-content.fb2-content p {
+            margin: 0 0 0.9rem 0;
+        }
+
+        .text-content.fb2-content .fb2-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 1.2rem 0 0.8rem;
+        }
+
+        .text-content.fb2-content .fb2-subtitle {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 1rem 0 0.6rem;
+        }
+
+        .text-content.fb2-content .fb2-annotation {
+            font-size: 0.95rem;
+            opacity: 0.9;
+            margin-bottom: 1rem;
+        }
+
+        .text-content.fb2-content .fb2-cite {
+            border-left: 3px solid #cbd5e1;
+            padding-left: 0.8rem;
+            margin: 0.8rem 0;
+        }
+
+        .text-content.fb2-content .fb2-poem {
+            margin: 0.8rem 0;
+            font-style: italic;
+        }
+
+        .text-content.fb2-content .fb2-verse {
+            margin: 0;
+        }
+
+        .text-viewer.dark-theme {
+            background: var(--reader-bg-dark);
+            color: var(--reader-text-dark);
+        }
+
+        .text-viewer.dark-theme .text-content {
+            color: var(--reader-text-dark);
+        }
+
+        
+        .bookmarks-sidebar {
+            position: fixed;
+            right: -360px;
+            top: 96px;
+            width: 360px;
+            height: calc(100vh - 112px);
+            background: #ffffff;
+            box-shadow: -8px 0 24px rgba(15, 23, 42, 0.12);
+            z-index: 999;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            border-radius: 16px 0 0 16px;
+            border-left: 1px solid rgba(15, 23, 42, 0.08);
+        }
+
+        .bookmarks-sidebar.open {
+            right: 0;
+        }
+
+        .bookmarks-header {
+            padding: 16px 18px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, #f7fafc 0%, #eef2f6 100%);
+        }
+
+        .bookmarks-search {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        }
+
+        .bookmarks-hint {
+            font-size: 0.78rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .bookmarks-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .bookmark-item {
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            background: #f7f9fc;
+            border-radius: 12px;
+            border: 1px solid rgba(15, 23, 42, 0.08);
+            border-left: 4px solid #1b6b7a;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .bookmark-item:hover {
+            background: #eef4f7;
+            transform: translateX(-2px);
+        }
+
+        .bookmark-item .bookmark-page {
+            font-weight: bold;
+            color: #1b6b7a;
+            margin-bottom: 5px;
+        }
+
+        .bookmark-item .bookmark-meta {
+            font-size: 0.85em;
+            color: #6b7280;
+            margin-bottom: 4px;
+        }
+
+        .bookmark-item .bookmark-note {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .bookmark-item .bookmark-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 5px;
+        }
+
+        .bookmark-item .bookmark-actions button {
+            padding: 4px 8px;
+            font-size: 0.85em;
+        }
+
+        
+        .reader-wrapper.dark-theme {
+
+
+
+
+        }
+
+        .reader-wrapper.dark-theme .bookmarks-sidebar {
+            background: #1f2833;
+            color: #e0e0e0;
+        }
+
+        .reader-wrapper.dark-theme .bookmarks-header {
+            background: #1a2430;
+            border-bottom-color: #2e3a4a;
+        }
+
+        .reader-wrapper.dark-theme .bookmarks-search input {
+            background: #1f2833;
+            color: #e0e0e0;
+            border-color: #2e3a4a;
+        }
+
+        .reader-wrapper.dark-theme .bookmark-item {
+            background: #243140;
+            border-left-color: #6fb3c8;
+            border-color: #2e3a4a;
+        }
+
+        .reader-wrapper.dark-theme .bookmark-item:hover {
+            background: #2a394a;
+        }
+
+        .reader-wrapper.dark-theme .bookmark-item .bookmark-note {
+            color: #aaa;
+        }
+
+        .reader-wrapper.dark-theme .bookmarks-hint {
+            color: #a1a1aa;
+        }
+
+        .reader-wrapper.dark-theme .reader-hint {
+            color: #a1a1aa;
+        }
+
+        .reader-wrapper.dark-theme .selection-toolbar {
+            background: #3b6b7a;
+        }
+
+        
+        .unsupported-format {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .reader-blocked {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+        }
+
+        .blocked-content {
+            text-align: center;
+            background: white;
+            padding: 3rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-coming-soon {
+            background: white;
+            border-radius: 20px;
+            padding: 4rem 3rem;
+            text-align: center;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+
+        @@media (max-width: 768px) {
+            .bookmarks-sidebar {
+                width: 100%;
+                right: -100%;
+                top: 92px;
+                height: calc(100vh - 108px);
+            }
+
+            .reader-container.with-sidebar {
+                margin-right: 0;
+            }
+
+            .reader-content {
+                padding: 12px;
+            }
+
+            .book-viewer,
+            .pdf-viewer,
+            .epub-viewer,
+            .text-viewer {
+                border-radius: 12px;
+            }
+
+            .reader-footer {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .reader-page-indicator {
+                min-width: 120px;
+            }
+
+            .reader-header h6 {
+                font-size: 0.9rem;
+            }
+
+            .reader-header .btn-sm {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.875rem;
+            }
+
+            .reader-search {
+                width: 100%;
+            }
+
+            .reader-search .form-control {
+                min-width: 0;
+            }
+        }
+    </style>
+}
+
+@section Scripts {
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    
+    <script src="~/lib/jszip/jszip.min.js"></script>
+    
+    <script src="~/lib/epubjs/epub.min.js"></script>
+    
+    <script>
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = () => resolve();
+                script.onerror = () => reject(new Error(`Failed to load ${src}`));
+                document.head.appendChild(script);
+            });
+        }
+
+        function ensureZipLib() {
+            if (window.JSZip) {
+                return Promise.resolve();
+            }
+
+            const fallbacks = [
+                '/lib/jszip/jszip.min.js',
+                'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+                'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
+            ];
+
+            let chain = Promise.reject();
+            fallbacks.forEach(src => {
+                chain = chain.catch(() => loadScript(src));
+            });
+
+            return chain.then(() => {
+                if (!window.JSZip) {
+                    throw new Error('JSZip library not available');
+                }
+            });
+        }
+
+        function ensureEpubLib() {
+            if (window.ePub) {
+                return Promise.resolve();
+            }
+
+            const fallbacks = [
+                '/lib/epubjs/epub.min.js',
+                'https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js',
+                'https://unpkg.com/epubjs@0.3.93/dist/epub.min.js'
+            ];
+
+            let chain = Promise.reject();
+            fallbacks.forEach(src => {
+                chain = chain.catch(() => loadScript(src));
+            });
+
+            return chain.then(() => {
+                if (!window.ePub) {
+                    throw new Error('ePub library not available');
+                }
+            });
+        }
+
+        const config = {
+            bookId: @bookId,
+            fileType: '@fileType',
+            fileUrl: '@fileUrl',
+            fontSize: parseInt(localStorage.getItem('readerFontSize')) || 16,
+            fontFamily: localStorage.getItem('readerFontFamily') || 'serif',
+            darkTheme: localStorage.getItem('readerDarkTheme') === 'true'
+        };
+
+        function showReaderMessage(message, type = 'warning') {
+            const alert = document.getElementById('readerAlert');
+            if (!alert) return;
+            alert.className = `alert alert-${type} reader-alert`;
+            alert.textContent = message;
+            alert.style.display = 'block';
+        }
+
+        function hideReaderMessage() {
+            const alert = document.getElementById('readerAlert');
+            if (!alert) return;
+            alert.style.display = 'none';
+        }
+
+
+        function reportReaderError(stage, error, detail) {
+            try {
+                fetch('@Url.Action("LogReaderError", "Client")', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        bookId: config.bookId,
+                        fileType: config.fileType,
+                        fileUrl: config.fileUrl,
+                        stage: stage,
+                        message: error ? (error.message || String(error)) : null,
+                        detail: detail || null
+                    })
+                });
+            } catch (e) {
+                console.warn('Failed to report reader error', e);
+            }
+        }
+
+        const fileTypeDebug = `${JSON.stringify(config.fileType)} len=${(config.fileType || '').length}`;
+        reportReaderError('init', null, `fileType=${fileTypeDebug}`);
+
+        try {
+
+            if (config.darkTheme) {
+                document.getElementById('readerWrapper').classList.add('dark-theme');
+                document.getElementById('themeIcon').className = 'fas fa-sun';
+            }
+
+        document.getElementById('fontSizeDecrease')?.addEventListener('click', () => {
+            config.fontSize = Math.max(12, config.fontSize - 2);
+            updateFontSize();
+        });
+
+        document.getElementById('fontSizeIncrease')?.addEventListener('click', () => {
+            config.fontSize = Math.min(24, config.fontSize + 2);
+            updateFontSize();
+        });
+
+        document.getElementById('fontSizeReset')?.addEventListener('click', () => {
+            config.fontSize = 16;
+            updateFontSize();
+        });
+
+        function updateFontSize() {
+            document.documentElement.style.setProperty('--reader-font-size', config.fontSize + 'px');
+            localStorage.setItem('readerFontSize', config.fontSize);
+
+            if (window.book?.rendition) {
+                window.book.rendition.themes.fontSize(config.fontSize + 'px');
+            }
+
+            const textViewer = document.querySelector('.text-viewer');
+            if (textViewer) {
+                textViewer.style.fontSize = config.fontSize + 'px';
+            }
+        }
+
+        const fontSelect = document.getElementById('fontFamilySelect');
+        if (fontSelect) {
+            fontSelect.value = config.fontFamily;
+            fontSelect.addEventListener('change', () => {
+                config.fontFamily = fontSelect.value;
+                updateFontFamily();
+            });
+        }
+
+        function updateFontFamily() {
+            localStorage.setItem('readerFontFamily', config.fontFamily);
+            const fontMap = {
+                serif: "Georgia, 'Times New Roman', serif",
+                sans: "Arial, Helvetica, sans-serif",
+                mono: "Consolas, 'Courier New', monospace"
+            };
+            const fontValue = fontMap[config.fontFamily] || fontMap.serif;
+
+            if (window.book?.rendition) {
+                window.book.rendition.themes.font(fontValue);
+            }
+
+            const textContent = document.querySelector('.text-content');
+            if (textContent) {
+                textContent.style.fontFamily = fontValue;
+            }
+        }
+
+        document.getElementById('themeToggle')?.addEventListener('click', () => {
+            config.darkTheme = !config.darkTheme;
+            const wrapper = document.getElementById('readerWrapper');
+            const icon = document.getElementById('themeIcon');
+            
+            if (config.darkTheme) {
+                wrapper.classList.add('dark-theme');
+                icon.className = 'fas fa-sun';
+            } else {
+                wrapper.classList.remove('dark-theme');
+                icon.className = 'fas fa-moon';
+            }
+            
+            localStorage.setItem('readerDarkTheme', config.darkTheme);
+            updateViewerTheme();
+        });
+
+        function updateViewerTheme() {
+            const textViewer = document.querySelector('.text-viewer');
+            if (window.book?.rendition) {
+                applyEpubTheme();
+            }
+            
+            if (textViewer) {
+                if (config.darkTheme) {
+                    textViewer.classList.add('dark-theme');
+                } else {
+                    textViewer.classList.remove('dark-theme');
+                }
+            }
+        }
+
+        function applyEpubTheme() {
+            if (!window.book?.rendition) return;
+            const themeName = config.darkTheme ? 'dark' : 'light';
+            window.book.rendition.themes.select(themeName);
+        }
+
+        function updateTextPageIndicator() {
+            const textViewer = document.querySelector('.text-viewer');
+            const indicator = document.getElementById('pageIndicator');
+            if (!textViewer || !indicator) return;
+
+            const pageSize = textViewer.clientHeight || 1;
+            const totalPages = Math.max(1, Math.ceil(textViewer.scrollHeight / pageSize));
+            const currentPage = Math.min(
+                totalPages,
+                Math.floor(textViewer.scrollTop / pageSize) + 1
+            );
+            indicator.textContent = `Страница ${currentPage} из ${totalPages}`;
+        }
+
+        function updateEpubPageIndicator(location) {
+            const indicator = document.getElementById('pageIndicator');
+            if (!indicator) return;
+            const displayed = location?.start?.displayed;
+            if (displayed?.page && displayed?.total) {
+                indicator.textContent = `Страница ${displayed.page} из ${displayed.total}`;
+            } else {
+                indicator.textContent = 'EPUB';
+            }
+        }
+
+        function updatePagerVisibility() {
+            const footer = document.getElementById('readerFooter');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            if (!footer || !prevBtn || !nextBtn) return;
+
+            if (config.fileType === 'pdf' || config.fileType === 'unknown') {
+                footer.style.display = 'none';
+                return;
+            }
+
+            footer.style.display = 'flex';
+            prevBtn.disabled = false;
+            nextBtn.disabled = false;
+        }
+
+        function updateSearchVisibility() {
+            const search = document.getElementById('readerSearch');
+            if (!search) return;
+            if (config.fileType === 'text' || config.fileType === 'fb2') {
+                search.style.display = 'inline-flex';
+            } else {
+                search.style.display = 'none';
+            }
+        }
+
+        let searchQuery = '';
+        let searchIndex = -1;
+        let originalTextContent = '';
+        let originalHtmlContent = '';
+        let isFb2Content = false;
+
+        function escapeHtml(value) {
+            return value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function applySearchHighlight() {
+            if (!(config.fileType === 'text' || config.fileType === 'fb2')) {
+                showReaderMessage('Поиск доступен только для FB2/TXT.', 'info');
+                return;
+            }
+
+            const textContent = document.getElementById('textContent');
+            if (!textContent) return;
+
+            const query = searchQuery.trim();
+            if (!query) {
+                clearSearchHighlight();
+                return;
+            }
+
+            const rawText = isFb2Content
+                ? (() => {
+                    const temp = document.createElement('div');
+                    temp.innerHTML = originalHtmlContent || '';
+                    return temp.textContent || '';
+                })()
+                : originalTextContent || textContent.textContent || '';
+            const escaped = escapeHtml(rawText);
+            const safeQuery = escapeHtml(query);
+            const regex = new RegExp(safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+            const highlighted = escaped.replace(regex, match => `<mark class="reader-mark">${match}</mark>`);
+            textContent.innerHTML = highlighted;
+            textContent.classList.add('fb2-content');
+            searchIndex = 0;
+            scrollToSearchMatch();
+        }
+
+        function clearSearchHighlight() {
+            searchIndex = -1;
+            const textContent = document.getElementById('textContent');
+            if (!textContent) return;
+            if (isFb2Content) {
+                textContent.innerHTML = originalHtmlContent || '';
+                textContent.classList.add('fb2-content');
+            } else {
+                textContent.textContent = originalTextContent || '';
+                textContent.classList.remove('fb2-content');
+            }
+        }
+
+        function scrollToSearchMatch() {
+            const textViewer = document.querySelector('.text-viewer');
+            const marks = document.querySelectorAll('.reader-mark');
+            if (!textViewer || !marks.length) return;
+            if (searchIndex < 0) searchIndex = 0;
+            if (searchIndex >= marks.length) searchIndex = 0;
+            const target = marks[searchIndex];
+            const top = target.getBoundingClientRect().top - textViewer.getBoundingClientRect().top;
+            textViewer.scrollBy({ top: top - 80, behavior: 'smooth' });
+        }
+
+        function parseFb2ToText(xmlText) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(xmlText, 'text/xml');
+                const body = doc.querySelector('FictionBook > body')
+                    || doc.querySelector('body')
+                    || doc.getElementsByTagNameNS('*', 'body')[0];
+                if (body) {
+                    return body.textContent || '';
+                }
+            } catch (error) {
+                console.warn('FB2 parse failed:', error);
+            }
+            return xmlText;
+        }
+
+        function parseFb2ToHtml(xmlText) {
+            try {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(xmlText, 'text/xml');
+                if (doc.querySelector('parsererror')) {
+                    return null;
+                }
+
+                const xsltText = `<?xml version="1.0" encoding="UTF-8"?>
+<xsl:stylesheet version="1.0"
+    xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+    xmlns:fb2="http://www.gribuser.ru/xml/fictionbook/2.0">
+  <xsl:output method="html" encoding="UTF-8" />
+  <xsl:template match="/">
+    <div class="fb2-body">
+      <xsl:apply-templates select="//fb2:body[1] | //body[1]" />
+    </div>
+  </xsl:template>
+  <xsl:template match="fb2:body|body">
+    <xsl:apply-templates />
+  </xsl:template>
+  <xsl:template match="fb2:section|section">
+    <div class="fb2-section"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:title|title">
+    <div class="fb2-title"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:subtitle|subtitle">
+    <div class="fb2-subtitle"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:annotation|annotation">
+    <div class="fb2-annotation"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:p|p">
+    <p><xsl:apply-templates /></p>
+  </xsl:template>
+  <xsl:template match="fb2:emphasis|emphasis">
+    <em><xsl:apply-templates /></em>
+  </xsl:template>
+  <xsl:template match="fb2:strong|strong">
+    <strong><xsl:apply-templates /></strong>
+  </xsl:template>
+  <xsl:template match="fb2:empty-line|empty-line">
+    <div class="fb2-empty"></div>
+  </xsl:template>
+  <xsl:template match="fb2:poem|poem">
+    <div class="fb2-poem"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:stanza|stanza">
+    <div class="fb2-stanza"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:v|v">
+    <div class="fb2-verse"><xsl:apply-templates /></div>
+  </xsl:template>
+  <xsl:template match="fb2:cite|cite">
+    <blockquote class="fb2-cite"><xsl:apply-templates /></blockquote>
+  </xsl:template>
+  <xsl:template match="text()">
+    <xsl:value-of select="." />
+  </xsl:template>
+</xsl:stylesheet>`;
+
+                const xsltDoc = parser.parseFromString(xsltText, 'text/xml');
+                const processor = new XSLTProcessor();
+                processor.importStylesheet(xsltDoc);
+                return processor.transformToFragment(doc, document);
+            } catch (error) {
+                console.warn('FB2 XSLT failed:', error);
+                return null;
+            }
+        }
+
+        function detectXmlEncoding(xmlText) {
+            const match = xmlText.match(/<\?xml[^>]*encoding=["']([^"']+)["']/i);
+            return match ? match[1].toLowerCase() : null;
+        }
+
+        function decodeFb2Buffer(buffer) {
+            const bytes = new Uint8Array(buffer);
+            if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+                return new TextDecoder('utf-8').decode(buffer);
+            }
+            if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+                try {
+                    return new TextDecoder('utf-16le').decode(buffer);
+                } catch (error) {
+                    console.warn('UTF-16LE decoder unavailable, fallback to utf-8:', error);
+                }
+            }
+            if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+                try {
+                    return new TextDecoder('utf-16be').decode(buffer);
+                } catch (error) {
+                    console.warn('UTF-16BE decoder unavailable, fallback to utf-8:', error);
+                }
+            }
+
+            const headerBytes = bytes.slice(0, 512);
+            const asciiProbe = String.fromCharCode(...headerBytes);
+            const encoding = detectXmlEncoding(asciiProbe) || 'utf-8';
+            try {
+                return new TextDecoder(encoding).decode(buffer);
+            } catch (error) {
+                console.warn('FB2 decode failed, fallback to utf-8:', error);
+                return new TextDecoder('utf-8').decode(buffer);
+            }
+        }
+
+        document.getElementById('bookmarksToggle')?.addEventListener('click', () => {
+            const sidebar = document.getElementById('bookmarksSidebar');
+            const container = document.getElementById('readerContainer');
+            sidebar.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                container?.classList.add('with-sidebar');
+                loadBookmarks();
+            } else {
+                container?.classList.remove('with-sidebar');
+            }
+        });
+
+        document.getElementById('closeBookmarks')?.addEventListener('click', () => {
+            document.getElementById('bookmarksSidebar').classList.remove('open');
+            document.getElementById('readerContainer')?.classList.remove('with-sidebar');
+        });
+
+        let currentBookmarks = [];
+        async function loadBookmarks(filterText = '') {
+            try {
+                const response = await fetch('@Url.Action("GetBookmarks", "Client")?bookId=' + config.bookId);
+                const bookmarks = await response.json();
+                currentBookmarks = bookmarks;
+                
+                const list = document.getElementById('bookmarksList');
+                const count = document.getElementById('bookmarkCount');
+                
+                const normalizedFilter = (filterText || '').trim().toLowerCase();
+                const filtered = normalizedFilter
+                    ? bookmarks.filter(b => {
+                        const title = (b.title || '').toLowerCase();
+                        const page = (b.page || '').toLowerCase();
+                        const note = (b.note || '').toLowerCase();
+                        return title.includes(normalizedFilter) || page.includes(normalizedFilter) || note.includes(normalizedFilter);
+                    })
+                    : bookmarks;
+
+                if (filtered.length === 0) {
+                    list.innerHTML = '<div class="text-center text-muted p-3">Нет закладок</div>';
+                    count.style.display = 'none';
+                } else {
+                    count.textContent = bookmarks.length;
+                    count.style.display = 'inline';
+                    list.innerHTML = filtered.map(bookmark => {
+                        const position = bookmark.position || '';
+                        const escapedPosition = position.replace(/'/g, "\\'");
+                        const title = (bookmark.title || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        const pageLabel = (bookmark.page || 'Без названия').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                        return `
+                        <div class="bookmark-item" data-bookmark-id="${bookmark.bookmarkID}">
+                            <div class="bookmark-page">${title || pageLabel}</div>
+                            ${title ? `<div class="bookmark-meta">${pageLabel}</div>` : ''}
+                            ${bookmark.note ? `<div class="bookmark-note">${bookmark.note.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>` : ''}
+                            <div class="bookmark-actions">
+                                <button class="btn btn-sm btn-primary" onclick="goToBookmark('${escapedPosition}')">
+                                    <i class="fas fa-arrow-right"></i> Перейти
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteBookmark(${bookmark.bookmarkID})">
+                                    <i class="fas fa-trash"></i> Удалить
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Error loading bookmarks:', error);
+                document.getElementById('bookmarksList').innerHTML = 
+                    '<div class="text-center text-danger p-3">Ошибка загрузки закладок</div>';
+            }
+        }
+
+        document.getElementById('bookmarkSearchInput')?.addEventListener('input', (event) => {
+            const value = event.target.value || '';
+            loadBookmarks(value);
+        });
+
+        function getCurrentBookmarkContext() {
+            let currentPosition = '';
+            let pageLabel = '';
+            if (config.fileType === 'pdf' && window.pdfViewer) {
+                currentPosition = `page-${window.currentPage || 1}`;
+                pageLabel = `Страница ${window.currentPage || 1}`;
+            } else if (config.fileType === 'epub' && window.book) {
+                const location = window.book.rendition?.currentLocation();
+                if (location?.start?.cfi) {
+                    currentPosition = location.start.cfi;
+                    const percent = typeof location.start.percentage === 'number'
+                        ? Math.round(location.start.percentage * 100)
+                        : null;
+                    pageLabel = percent !== null ? `Прогресс ${percent}%` : 'Текущее место';
+                }
+            } else if (config.fileType === 'text' || config.fileType === 'fb2') {
+                const textViewer = document.querySelector('.text-viewer');
+                if (textViewer) {
+                    const maxScroll = textViewer.scrollHeight - textViewer.clientHeight;
+                    const scrollTop = textViewer.scrollTop;
+                    const percent = maxScroll > 0 ? Math.round((scrollTop / maxScroll) * 100) : 0;
+                    currentPosition = `scroll-${scrollTop}`;
+                    pageLabel = `Прогресс ${percent}%`;
+                }
+            }
+            return { currentPosition, pageLabel };
+        }
+
+        function openBookmarkModal(prefillTitle, prefillNote) {
+            const modal = new bootstrap.Modal(document.getElementById('addBookmarkModal'));
+            document.getElementById('bookmarkId').value = '0';
+            document.getElementById('bookmarkForm').reset();
+            document.getElementById('bookmarkBookId').value = config.bookId;
+
+            const context = getCurrentBookmarkContext();
+            if (context.pageLabel) {
+                document.getElementById('bookmarkPage').value = context.pageLabel;
+            }
+            document.getElementById('bookmarkPosition').value = context.currentPosition;
+
+            if (prefillTitle) {
+                const title = prefillTitle.length > 200 ? `${prefillTitle.slice(0, 200)}…` : prefillTitle;
+                document.getElementById('bookmarkTitle').value = title;
+            }
+            if (prefillNote) {
+                const note = prefillNote.length > 200 ? `${prefillNote.slice(0, 200)}…` : prefillNote;
+                document.getElementById('bookmarkNote').value = note;
+            }
+
+            modal.show();
+        }
+
+        document.getElementById('addBookmarkBtn')?.addEventListener('click', () => {
+            openBookmarkModal('', '');
+        });
+
+        let selectedBookmarkText = '';
+        const selectionToolbar = document.getElementById('selectionToolbar');
+        const selectionBookmarkBtn = document.getElementById('selectionBookmarkBtn');
+
+        function hideSelectionToolbar() {
+            if (!selectionToolbar) return;
+            selectionToolbar.style.display = 'none';
+        }
+
+        function showSelectionToolbar(rect) {
+            if (!selectionToolbar) return;
+            const viewer = document.getElementById('bookViewer');
+            if (!viewer) return;
+            const viewerRect = viewer.getBoundingClientRect();
+            const offsetX = rect.left - viewerRect.left;
+            const offsetY = rect.top - viewerRect.top;
+            const top = Math.max(8, offsetY - 44);
+            const left = Math.min(Math.max(8, offsetX), viewerRect.width - 120);
+            selectionToolbar.style.top = `${top}px`;
+            selectionToolbar.style.left = `${left}px`;
+            selectionToolbar.style.display = 'inline-flex';
+        }
+
+        function handleTextSelection() {
+            if (!(config.fileType === 'text' || config.fileType === 'fb2')) {
+                hideSelectionToolbar();
+                return;
+            }
+            const textViewer = document.querySelector('.text-viewer');
+            if (!textViewer) return;
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+                hideSelectionToolbar();
+                return;
+            }
+            if (!textViewer.contains(selection.anchorNode)) {
+                hideSelectionToolbar();
+                return;
+            }
+            const text = selection.toString().trim();
+            if (text.length < 2) {
+                hideSelectionToolbar();
+                return;
+            }
+            selectedBookmarkText = text;
+            const rect = selection.getRangeAt(0).getBoundingClientRect();
+            showSelectionToolbar(rect);
+        }
+
+        document.querySelector('.text-viewer')?.addEventListener('mouseup', handleTextSelection);
+        document.querySelector('.text-viewer')?.addEventListener('keyup', handleTextSelection);
+        document.querySelector('.text-viewer')?.addEventListener('touchend', handleTextSelection);
+        document.querySelector('.text-viewer')?.addEventListener('scroll', hideSelectionToolbar);
+        document.addEventListener('click', (event) => {
+            if (!selectionToolbar) return;
+            if (!selectionToolbar.contains(event.target)) {
+                hideSelectionToolbar();
+            }
+        });
+
+        selectionBookmarkBtn?.addEventListener('click', () => {
+            const title = selectedBookmarkText || '';
+            hideSelectionToolbar();
+            if (window.getSelection) {
+                window.getSelection().removeAllRanges();
+            }
+            openBookmarkModal(title, '');
+        });
+
+        document.getElementById('bookSearchInput')?.addEventListener('input', (event) => {
+            searchQuery = event.target.value || '';
+            applySearchHighlight();
+        });
+
+        document.getElementById('bookSearchPrev')?.addEventListener('click', () => {
+            searchIndex = Math.max(0, searchIndex - 1);
+            scrollToSearchMatch();
+        });
+
+        document.getElementById('bookSearchNext')?.addEventListener('click', () => {
+            searchIndex += 1;
+            scrollToSearchMatch();
+        });
+
+        document.getElementById('bookSearchClear')?.addEventListener('click', () => {
+            const input = document.getElementById('bookSearchInput');
+            if (input) {
+                input.value = '';
+            }
+            searchQuery = '';
+            clearSearchHighlight();
+        });
+
+        document.getElementById('saveBookmarkBtn')?.addEventListener('click', async () => {
+            const form = document.getElementById('bookmarkForm');
+            const formData = new FormData(form);
+            const data = {
+                bookmarkID: parseInt(formData.get('bookmarkId')) || 0,
+                bookID: parseInt(formData.get('bookID')),
+                title: formData.get('title') || '',
+                page: formData.get('page') || '',
+                position: formData.get('position') || '',
+                note: formData.get('note') || ''
+            };
+
+            try {
+                const url = data.bookmarkID > 0 
+                    ? '@Url.Action("UpdateBookmark", "Client")'
+                    : '@Url.Action("AddBookmark", "Client")';
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('addBookmarkModal')).hide();
+                    loadBookmarks();
+                } else {
+                    alert('Ошибка при сохранении закладки');
+                }
+            } catch (error) {
+                console.error('Error saving bookmark:', error);
+                alert('Ошибка при сохранении закладки');
+            }
+        });
+
+        window.deleteBookmark = async function(bookmarkId) {
+            if (!confirm('Удалить эту закладку?')) return;
+            
+            try {
+                const response = await fetch('@Url.Action("DeleteBookmark", "Client")?bookmarkId=' + bookmarkId, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    loadBookmarks();
+                } else {
+                    alert('Ошибка при удалении закладки');
+                }
+            } catch (error) {
+                console.error('Error deleting bookmark:', error);
+                alert('Ошибка при удалении закладки');
+            }
+        };
+
+        window.goToBookmark = function(position) {
+            if (!position) return;
+            
+            if (config.fileType === 'pdf' && window.pdfViewer) {
+                const pageMatch = position.match(/page-(\d+)/);
+                if (pageMatch) {
+                    window.pdfViewer.currentPageNumber = parseInt(pageMatch[1]);
+                }
+            } else if (config.fileType === 'epub' && window.book) {
+                window.book.rendition.display(position);
+            } else if ((config.fileType === 'text' || config.fileType === 'fb2')) {
+                const scrollMatch = position.match(/scroll-(\d+)/);
+                const textViewer = document.querySelector('.text-viewer');
+                if (scrollMatch && textViewer) {
+                    const scrollTop = parseInt(scrollMatch[1], 10);
+                    textViewer.scrollTo({ top: scrollTop, behavior: 'smooth' });
+                    requestAnimationFrame(updateTextPageIndicator);
+                }
+            }
+        };
+
+        document.getElementById('prevPageBtn')?.addEventListener('click', () => {
+            if (config.fileType === 'epub' && window.book?.rendition) {
+                window.book.rendition.prev();
+                return;
+            }
+            if (config.fileType === 'text' || config.fileType === 'fb2') {
+                const textViewer = document.querySelector('.text-viewer');
+                if (!textViewer) return;
+                textViewer.scrollBy({ top: -textViewer.clientHeight, behavior: 'smooth' });
+                requestAnimationFrame(updateTextPageIndicator);
+            }
+        });
+
+        document.getElementById('nextPageBtn')?.addEventListener('click', () => {
+            if (config.fileType === 'epub' && window.book?.rendition) {
+                window.book.rendition.next();
+                return;
+            }
+            if (config.fileType === 'text' || config.fileType === 'fb2') {
+                const textViewer = document.querySelector('.text-viewer');
+                if (!textViewer) return;
+                textViewer.scrollBy({ top: textViewer.clientHeight, behavior: 'smooth' });
+                requestAnimationFrame(updateTextPageIndicator);
+            }
+        });
+
+        let readerBranch = 'none';
+        if (config.fileType === 'pdf') {
+            readerBranch = 'pdf';
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+            
+            fetch(config.fileUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        showReaderMessage('Файл не найден или недоступен для чтения.');
+                        throw new Error('PDF file not found');
+                    }
+                    return response.arrayBuffer();
+                })
+                .then(data => {
+                    return pdfjsLib.getDocument({ data: data }).promise;
+                })
+                .then(pdf => {
+                    window.pdfViewer = pdf;
+                    const viewer = document.getElementById('pdfViewer');
+                    let currentPage = 1;
+                    window.currentPage = currentPage;
+
+                    function renderPage(pageNum) {
+                        pdf.getPage(pageNum).then(page => {
+                            const scale = 1.5;
+                            const viewport = page.getViewport({ scale: scale });
+                            const canvas = document.createElement('canvas');
+                            const context = canvas.getContext('2d');
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            
+                            const renderContext = {
+                                canvasContext: context,
+                                viewport: viewport
+                            };
+                            
+                            page.render(renderContext).promise.then(() => {
+                                viewer.appendChild(canvas);
+                                
+                                if (pageNum < pdf.numPages) {
+                                    renderPage(pageNum + 1);
+                                }
+                            });
+                        });
+                    }
+
+                    renderPage(1);
+                })
+                .catch(error => {
+                    console.error('Error loading PDF:', error);
+                    document.getElementById('pdfViewer').innerHTML = 
+                        '<div class="text-center p-5"><i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i><p>Ошибка загрузки PDF файла</p></div>';
+                });
+        } else if (config.fileType === 'epub') {
+            readerBranch = 'epub';
+            reportReaderError('epub-start', null, `url=${config.fileUrl}`);
+            showReaderMessage('Загрузка EPUB...', 'info');
+            ensureZipLib()
+                .then(() => ensureEpubLib())
+                .then(() => {
+            function initEpubThemes() {
+                if (!window.book?.rendition) return;
+                window.book.rendition.themes.register('light', {
+                    body: {
+                        'background': '#ffffff',
+                        'color': '#333333'
+                    },
+                    'a': {
+                        'color': '#0d6efd'
+                    }
+                });
+                window.book.rendition.themes.register('dark', {
+                    body: {
+                        'background': '#1a1a1a',
+                        'color': '#e0e0e0'
+                    },
+                    'a': {
+                        'color': '#9ec5fe'
+                    }
+                });
+            }
+
+            let epubRenderTimeoutId = null;
+
+            function createEpubBook() {
+                window.book = ePub();
+                window.book.on('openFailed', (err) => {
+                    reportReaderError('epub-open-failed', err);
+                });
+                window.book.ready.catch(err => {
+                    reportReaderError('epub-ready', err);
+                    showReaderMessage('Файл EPUB поврежден или имеет неверный формат.');
+                });
+                return window.book;
+            }
+
+            function renderEpub() {
+                const viewer = document.getElementById('epubViewer');
+                if (viewer) {
+                    viewer.innerHTML = '';
+                }
+
+                if (epubRenderTimeoutId) {
+                    clearTimeout(epubRenderTimeoutId);
+                }
+                epubRenderTimeoutId = setTimeout(() => {
+                    reportReaderError('epub-render-timeout', null);
+                    showReaderMessage('Не удалось отобразить EPUB. Попробуйте другой файл.');
+                }, 7000);
+
+                return window.book.ready.then(() => {
+                    const rendition = window.book.renderTo('epubViewer', {
+                        width: '100%',
+                        height: '100%',
+                        spread: 'none'
+                    });
+                    window.book.rendition = rendition;
+                    rendition.on('rendered', () => {
+                        updateFontSize();
+                        updateFontFamily();
+                        updateViewerTheme();
+                    });
+                    rendition.on('relocated', (location) => {
+                        updateEpubPageIndicator(location);
+                    });
+
+                    initEpubThemes();
+
+                    return rendition.display()
+                        .then(() => {
+                            updateFontSize();
+                            updateFontFamily();
+                            updateViewerTheme();
+                            hideReaderMessage();
+                            updatePagerVisibility();
+                            if (epubRenderTimeoutId) {
+                                clearTimeout(epubRenderTimeoutId);
+                                epubRenderTimeoutId = null;
+                            }
+                        });
+                });
+            }
+
+            function loadEpubFromBuffer() {
+                return fetch(config.fileUrl, { credentials: 'same-origin' })
+                    .then(response => {
+                        if (!response.ok) {
+                            showReaderMessage('Файл не найден или недоступен для чтения.');
+                            const err = new Error('EPUB file not found');
+                            err.epubNotFound = true;
+                            reportReaderError('epub-fetch-buffer', err, `status=${response.status}`);
+                            throw err;
+                        }
+                        return response.arrayBuffer();
+                    })
+                    .then(data => {
+                        const book = createEpubBook();
+                        book.open(data, 'binary');
+                        return renderEpub();
+                    });
+            }
+
+            function loadEpubFromUrl() {
+                const book = createEpubBook();
+                book.open(config.fileUrl);
+                return renderEpub();
+            }
+
+            loadEpubFromBuffer()
+                .then(() => {
+                    reportReaderError('epub-buffer-ok', null, null);
+                })
+                .catch(err => {
+                    if (!err?.epubNotFound) {
+                        reportReaderError('epub-buffer-fallback', err);
+                        return loadEpubFromUrl();
+                    }
+                    throw err;
+                })
+                .catch(error => {
+                    console.error('Error loading EPUB:', error);
+                    reportReaderError('epub-final', error);
+                    document.getElementById('epubViewer').innerHTML =
+                        '<div class="text-center p-5"><i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i><p>Ошибка загрузки EPUB файла</p></div>';
+                });
+            }).catch(error => {
+                console.error('EPUB library load failed:', error);
+                reportReaderError('epub-lib', error);
+                showReaderMessage('Не удалось загрузить библиотеку для EPUB. Проверьте доступ к CDN.');
+            });
+        } else if (config.fileType === 'text' || config.fileType === 'fb2') {
+            readerBranch = 'text';
+            updatePagerVisibility();
+            const loadTextContent = (text) => {
+                const content = config.fileType === 'fb2'
+                    ? parseFb2ToText(text)
+                    : text;
+                const textContent = document.getElementById('textContent');
+                textContent.classList.remove('fb2-content');
+                originalTextContent = content || text || '';
+                originalHtmlContent = '';
+                isFb2Content = false;
+                textContent.textContent = originalTextContent;
+                reportReaderError('text-loaded', null, `len=${(textContent.textContent || '').length}`);
+                updateViewerTheme();
+                updateTextPageIndicator();
+            };
+
+            const loadFb2Content = (xmlText) => {
+                const textContent = document.getElementById('textContent');
+                const htmlFragment = parseFb2ToHtml(xmlText);
+                if (!htmlFragment || !htmlFragment.textContent || !htmlFragment.textContent.trim()) {
+                    loadTextContent(xmlText);
+                    return;
+                }
+                textContent.innerHTML = '';
+                textContent.appendChild(htmlFragment);
+                textContent.classList.add('fb2-content');
+                originalHtmlContent = textContent.innerHTML;
+                originalTextContent = '';
+                isFb2Content = true;
+                reportReaderError('fb2-loaded', null, `len=${(textContent.textContent || '').length}`);
+                updateViewerTheme();
+                updateTextPageIndicator();
+            };
+
+            const loadFb2FromZip = (buffer) => {
+                return ensureZipLib()
+                    .then(() => window.JSZip.loadAsync(buffer))
+                    .then(zip => {
+                        const fb2Entry = Object.keys(zip.files)
+                            .find(name => name.toLowerCase().endsWith('.fb2'));
+                        if (!fb2Entry) {
+                            throw new Error('FB2 file not found inside zip');
+                        }
+                        return zip.files[fb2Entry].async('text');
+                    });
+            };
+
+            fetch(config.fileUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        showReaderMessage('Файл не найден или недоступен для чтения.');
+                        reportReaderError('text-fetch', new Error('Text file not found'), `status=${response.status} url=${config.fileUrl}`);
+                        throw new Error('Text file not found');
+                    }
+                    if (config.fileType === 'fb2') {
+                        return response.arrayBuffer();
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    if (config.fileType !== 'fb2') {
+                        loadTextContent(data);
+                        return;
+                    }
+
+                    const text = decodeFb2Buffer(data);
+                    if (text.trimStart().startsWith('<')) {
+                        loadFb2Content(text);
+                        return;
+                    }
+
+                    return loadFb2FromZip(data)
+                        .then(zipText => {
+                            loadFb2Content(zipText);
+                        })
+                        .catch(error => {
+                            reportReaderError('fb2-zip', error);
+                            throw error;
+                        });
+                })
+                .catch(error => {
+                    console.error('Error loading text file:', error);
+                    reportReaderError('text-final', error);
+                    document.getElementById('textContent').textContent = 'Ошибка загрузки файла';
+                });
+        }
+        reportReaderError('branch', null, `branch=${readerBranch}`);
+        } catch (error) {
+            reportReaderError('script-crash', error);
+            throw error;
+        }
+
+        updateFontSize();
+        updatePagerVisibility();
+        updateSearchVisibility();
+
+        const textViewer = document.querySelector('.text-viewer');
+        if (textViewer) {
+            let ticking = false;
+            textViewer.addEventListener('scroll', () => {
+                if (ticking) return;
+                ticking = true;
+                requestAnimationFrame(() => {
+                    updateTextPageIndicator();
+                    ticking = false;
+                });
+            });
+            window.addEventListener('resize', () => {
+                updateTextPageIndicator();
+            });
+        }
+    </script>
+}

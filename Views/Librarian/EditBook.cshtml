@@ -1,0 +1,88 @@
+﻿@model Book
+@using LibraryMPT.Models
+@using Microsoft.AspNetCore.Mvc.Rendering
+@{
+    ViewBag.Title = "Редактировать книгу";
+    Layout = "_Layout";
+    var categories = ViewBag.Categories as IEnumerable<SelectListItem> ?? new List<SelectListItem>();
+    var authors = ViewBag.Authors as List<Author> ?? new List<Author>();
+    var publishers = ViewBag.Publishers as List<Publisher> ?? new List<Publisher>();
+}
+
+<h2>Редактировать книгу</h2>
+
+<form asp-action="EditBook" method="post">
+    <input type="hidden" asp-for="BookID" />
+
+    <div class="mb-3">
+        <label class="form-label">Название</label>
+        <input asp-for="Title" class="form-control" required />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Категория</label>
+        <select asp-for="CategoryID" class="form-select"
+                asp-items="categories" required></select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Автор</label>
+        <select asp-for="AuthorID" class="form-select" required>
+            <option value="">-- Выберите автора --</option>
+            @foreach (var a in authors)
+            {
+                if (a.AuthorID == Model.AuthorID)
+                {
+                    <option value="@a.AuthorID" selected="selected">@a.FirstName @a.LastName</option>
+                }
+                else
+                {
+                    <option value="@a.AuthorID">@a.FirstName @a.LastName</option>
+                }
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Издательство</label>
+        <select asp-for="PublisherID" class="form-select">
+            <option value="">-- Не выбрано --</option>
+            @foreach (var p in publishers)
+            {
+                if (p.PublisherID == Model.PublisherID)
+                {
+                    <option value="@p.PublisherID" selected="selected">@p.PublisherName</option>
+                }
+                else
+                {
+                    <option value="@p.PublisherID">@p.PublisherName</option>
+                }
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Год издания</label>
+        <input asp-for="PublishYear" type="number" class="form-control" min="1" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Путь к файлу</label>
+        <input asp-for="FilePath" class="form-control" required />
+    </div>
+
+    <div class="form-check mb-3">
+        <input asp-for="RequiresSubscription" class="form-check-input" />
+        <label class="form-check-label">
+            Требуется подписка для доступа
+        </label>
+    </div>
+
+    <button type="submit" class="btn btn-warning">
+        <i class="fas fa-save"></i> Сохранить
+    </button>
+
+    <a asp-action="BookManagement" class="btn btn-secondary ms-2">
+        <i class="fas fa-arrow-left me-1"></i> Назад
+    </a>
+</form>

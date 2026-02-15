@@ -1,0 +1,73 @@
+using LibraryMPT.Data;
+using LibraryMPT.Api.Extensions;
+using LibraryMPT.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace LibraryMPT.Api.Controllers;
+
+[ApiController]
+[Route("api/home")]
+[AllowAnonymous]
+public sealed class HomeApiController : ControllerBase
+{
+    private readonly LibraryContext _context;
+
+    public HomeApiController(LibraryContext context)
+    {
+        _context = context;
+    }
+
+    [HttpGet("index")]
+    public async Task<ActionResult<HomeIndexResponse>> Index()
+    {
+        var totalUsers = await _context.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Users")
+            .SingleAsync();
+
+        var totalBooks = await _context.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Books")
+            .SingleAsync();
+
+        var downloads = await _context.Database
+            .SqlQuery<int>($"""
+                SELECT COUNT(*) AS Value
+                FROM BookLogs
+                WHERE ActionType = 'DOWNLOAD'
+            """)
+            .SingleAsync();
+
+        var totalWithFile = await _context.Database
+            .SqlQuery<int>($"""
+                SELECT COUNT(*) AS Value
+                FROM Books
+                WHERE FilePath IS NOT NULL AND LTRIM(RTRIM(FilePath)) <> ''
+            """)
+            .SingleAsync();
+
+        var availability = totalBooks > 0
+            ? (int)Math.Round(totalWithFile * 100.0 / totalBooks)
+            : 100;
+
+        bool? isTwoFactorEnabled = null;
+        var userId = User.GetUserId();
+        var isStudent = User.Identity?.IsAuthenticated == true && User.IsInRole("Student");
+        if (isStudent && userId > 0)
+        {
+            isTwoFactorEnabled = await _context.Database
+                .SqlQuery<bool>($"SELECT IsTwoFactorEnabled AS Value FROM Users WHERE UserID = {userId}")
+                .SingleOrDefaultAsync();
+        }
+
+        return Ok(new HomeIndexResponse
+        {
+            TotalUsers = totalUsers,
+            TotalBooks = totalBooks,
+            Downloads = downloads,
+            Availability = availability,
+            IsTwoFactorEnabled = isTwoFactorEnabled
+        });
+    }
+}
+

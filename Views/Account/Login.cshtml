@@ -1,0 +1,74 @@
+﻿@{
+    ViewBag.Title = "Вход в систему";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="custom-card" style="max-width: 420px; width: 100%;">
+        <div class="custom-card-header text-center"
+             style="background: linear-gradient(135deg, #3498DB 0%, #5DADE2 100%);">
+            <h4 class="mb-0">
+                <i class="fas fa-sign-in-alt me-2"></i>Вход в LibraryMPT
+            </h4>
+        </div>
+
+        <div class="custom-card-body">
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="alert alert-danger mb-3">
+                    @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+                    {
+                        <div>
+                            <i class="fas fa-exclamation-circle me-2"></i>@error.ErrorMessage
+                        </div>
+                    }
+                </div>
+            }
+
+            <form method="post">
+                <div class="mb-3">
+                    <label class="form-label">Логин</label>
+                    <input name="username"
+                           class="form-control rounded-xl"
+                           placeholder="Введите логин"
+                           required />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Пароль</label>
+                    <input type="password"
+                           name="password"
+                           class="form-control rounded-xl"
+                           placeholder="Введите пароль"
+                           required />
+                    <div class="text-end mt-2">
+                        <a href="@Url.Action("ForgotPassword", "Account")" 
+                           class="text-decoration-none small text-muted">
+                            <i class="fas fa-key me-1"></i>Забыли пароль?
+                        </a>
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-primary-custom btn-custom w-100 mb-3">
+                    <i class="fas fa-door-open me-2"></i>Войти
+                </button>
+            </form>
+
+            <form asp-controller="Account" asp-action="GuestLogin" method="post" class="mb-3">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-outline-secondary w-100">
+                    <i class="fas fa-user me-2"></i>Войти как гость (30% книги)
+                </button>
+            </form>
+
+            <div class="text-center">
+                <span class="text-muted">Нет аккаунта?</span><br />
+                <a href="@Url.Action("Register", "Account")"
+                   class="btn btn-link mt-1">
+                    <i class="fas fa-user-plus me-1"></i>Зарегистрироваться
+                </a>
+            </div>
+        </div>
+    </div>
+</div>

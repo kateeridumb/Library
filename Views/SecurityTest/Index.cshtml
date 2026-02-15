@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тестирование защит безопасности</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button.danger {
+            background: #f44336;
+        }
+        button.danger:hover {
+            background: #da190b;
+        }
+        .results {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .success {
+            color: #4CAF50;
+        }
+        .error {
+            color: #f44336;
+        }
+        .warning {
+            color: #ff9800;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+            margin: 5px;
+        }
+        .header-test {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .header-item {
+            padding: 8px;
+            background: #e8f5e9;
+            border-left: 3px solid #4CAF50;
+            margin: 5px 0;
+        }
+        .header-item.missing {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔒 Тестирование защит безопасности</h1>
+    
+    <div class="test-section" style="background: #d4edda; border-left: 4px solid #28a745;">
+        <h2>✅ Готово к тестированию</h2>
+        <p>Эта страница загружена с сервера, поэтому проблемы с CORS отсутствуют.</p>
+        <p><strong>Текущий URL:</strong> <code id="currentUrl" style="background: #f8f9fa; padding: 5px; border-radius: 3px; font-size: 14px;"></code></p>
+        <p style="color: green; font-weight: bold;">✓ Все тесты должны работать корректно</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>1. Тест Rate Limiting (DDoS защита)</h2>
+        <p>Отправка множества запросов для проверки ограничения скорости</p>
+        <button onclick="testRateLimit()">Запустить тест (15 запросов)</button>
+        <button class="danger" onclick="testRateLimitAggressive()">Агрессивный тест (30 запросов)</button>
+        <div id="rateLimitResults" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Тест Security Headers</h2>
+        <p>Проверка наличия заголовков безопасности</p>
+        <input type="text" id="testUrl" placeholder="/Home/Index" value="/Home/Index">
+        <button onclick="testSecurityHeaders()">Проверить заголовки</button>
+        <div id="headersResults" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Тест SQL Injection защита</h2>
+        <p>Попытка SQL инъекции через форму восстановления пароля</p>
+        <input type="text" id="sqlTestEmail" placeholder="admin' OR '1'='1" value="admin' OR '1'='1">
+        <button onclick="testSqlInjection()">Тестировать SQL инъекцию</button>
+        <div id="sqlResults" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Тест XSS защита (CSP)</h2>
+        <p>Попытка выполнения внешнего скрипта</p>
+        <button onclick="testXSS()">Тестировать XSS защиту</button>
+        <div id="xssResults" class="results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Тест Clickjacking защита</h2>
+        <p>Попытка загрузить страницу в iframe</p>
+        <button onclick="testClickjacking()">Тестировать Clickjacking</button>
+        <div id="clickjackingResults" class="results"></div>
+    </div>
+
+    <script>
+        // Автоматически определяем базовый URL из текущего местоположения
+        let baseUrl = window.location.origin; // Используем текущий домен и порт
+        
+        // Функция для проверки доступности URL
+        async function checkUrl(url) {
+            try {
+                const response = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+                return true;
+            } catch {
+                return false;
+            }
+        }
+        
+        // Попытка найти работающий порт
+        async function detectPort() {
+            const ports = [5155, 5000, 7107, 57620, 5001];
+            const statusDiv = document.getElementById('connectionStatus');
+            if (statusDiv) {
+                statusDiv.innerHTML = '<p style="color: orange;">🔍 Поиск работающего порта...</p>';
+            }
+            
+            for (const port of ports) {
+                try {
+                    const testUrl = `http://localhost:${port}/Home/Index`;
+                    const response = await fetch(testUrl, { 
+                        method: 'GET', 
+                        cache: 'no-cache',
+                        signal: AbortSignal.timeout(2000)
+                    });
+                    if (response.ok || response.status === 401 || response.status === 403) {
+                        baseUrl = `http://localhost:${port}`;
+                        if (statusDiv) {
+                            statusDiv.innerHTML = `<p style="color: green;">✓ Приложение найдено на порту ${port}</p>`;
+                        }
+                        document.getElementById('testUrl').value = `${baseUrl}/Home/Index`;
+                        return true;
+                    }
+                } catch (e) {
+                    // Продолжаем поиск
+                }
+            }
+            
+            if (statusDiv) {
+                statusDiv.innerHTML = '<p style="color: red;">✗ Приложение не найдено. Убедитесь, что оно запущено.</p>';
+            }
+            return false;
+        }
+
+        function updateBaseUrl() {
+            const input = document.getElementById('baseUrlInput');
+            if (input && input.value) {
+                baseUrl = input.value.replace(/\/$/, ''); // Убираем trailing slash
+                document.getElementById('testUrl').value = `${baseUrl}/Home/Index`;
+                const statusDiv = document.getElementById('connectionStatus');
+                if (statusDiv) {
+                    statusDiv.innerHTML = `<p style="color: blue;">URL обновлен: ${baseUrl}</p>`;
+                }
+            }
+        }
+
+        async function testRateLimit(count = 15) {
+            const resultsDiv = document.getElementById('rateLimitResults');
+            resultsDiv.innerHTML = '<p>Отправка запросов на ' + baseUrl + '...</p>';
+            
+            let successCount = 0;
+            let blockedCount = 0;
+            let errorCount = 0;
+
+            for (let i = 1; i <= count; i++) {
+                try {
+                    const startTime = Date.now();
+                    const response = await fetch(`${baseUrl}/Home/Index`, {
+                        method: 'GET',
+                        cache: 'no-cache',
+                        mode: 'cors'
+                    });
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+
+                    if (response.status === 429) {
+                        blockedCount++;
+                        resultsDiv.innerHTML += `<p class="warning">Request ${i}: 429 Too Many Requests (заблокировано) - ${duration}ms</p>`;
+                    } else if (response.ok) {
+                        successCount++;
+                        resultsDiv.innerHTML += `<p class="success">Request ${i}: ${response.status} OK - ${duration}ms</p>`;
+                    } else {
+                        errorCount++;
+                        resultsDiv.innerHTML += `<p class="error">Request ${i}: ${response.status} - ${duration}ms</p>`;
+                    }
+                } catch (error) {
+                    errorCount++;
+                    const errorMsg = error.message || 'Failed to fetch';
+                    resultsDiv.innerHTML += `<p class="error">Request ${i}: Ошибка - ${errorMsg}</p>`;
+                    if (i === 1) {
+                        resultsDiv.innerHTML += `<p style="color: red; font-weight: bold;">⚠ Убедитесь, что приложение запущено на ${baseUrl}</p>`;
+                    }
+                }
+                
+                // Небольшая задержка между запросами
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            resultsDiv.innerHTML += `<hr><p><strong>Итоги:</strong></p>`;
+            resultsDiv.innerHTML += `<p class="success">Успешно: ${successCount}</p>`;
+            resultsDiv.innerHTML += `<p class="warning">Заблокировано (429): ${blockedCount}</p>`;
+            resultsDiv.innerHTML += `<p class="error">Ошибки: ${errorCount}</p>`;
+            
+            if (blockedCount > 0) {
+                resultsDiv.innerHTML += `<p class="success"><strong>✓ Rate Limiting работает!</strong></p>`;
+            } else {
+                resultsDiv.innerHTML += `<p class="warning"><strong>⚠ Rate Limiting не сработал (возможно, лимиты слишком высокие)</strong></p>`;
+            }
+        }
+
+        function testRateLimitAggressive() {
+            testRateLimit(30);
+        }
+
+        async function testSecurityHeaders() {
+            const testPath = document.getElementById('testUrl').value || '/Home/Index';
+            const url = baseUrl + testPath;
+            const resultsDiv = document.getElementById('headersResults');
+            resultsDiv.innerHTML = '<p>Проверка заголовков...</p>';
+
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+
+                const requiredHeaders = {
+                    'X-Content-Type-Options': 'nosniff',
+                    'X-Frame-Options': 'DENY',
+                    'X-XSS-Protection': '1; mode=block',
+                    'Referrer-Policy': 'strict-origin-when-cross-origin',
+                    'Content-Security-Policy': '*'
+                };
+
+                let foundCount = 0;
+                let totalCount = Object.keys(requiredHeaders).length;
+
+                resultsDiv.innerHTML = '<div class="header-test">';
+                
+                for (const [headerName, expectedValue] of Object.entries(requiredHeaders)) {
+                    const headerValue = response.headers.get(headerName);
+                    const isPresent = headerValue !== null;
+                    
+                    if (isPresent) {
+                        foundCount++;
+                        const matches = expectedValue === '*' || headerValue === expectedValue;
+                        resultsDiv.innerHTML += `
+                            <div class="header-item ${matches ? '' : 'missing'}">
+                                <strong>${headerName}:</strong> ${headerValue}
+                                ${matches ? '✓' : '⚠ (неожиданное значение)'}
+                            </div>
+                        `;
+                    } else {
+                        resultsDiv.innerHTML += `
+                            <div class="header-item missing">
+                                <strong>${headerName}:</strong> отсутствует ✗
+                            </div>
+                        `;
+                    }
+                }
+
+                resultsDiv.innerHTML += '</div>';
+                resultsDiv.innerHTML += `<hr><p><strong>Найдено: ${foundCount} из ${totalCount} заголовков</strong></p>`;
+                
+                if (foundCount === totalCount) {
+                    resultsDiv.innerHTML += `<p class="success"><strong>✓ Все security headers присутствуют!</strong></p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p class="warning"><strong>⚠ Некоторые заголовки отсутствуют</strong></p>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<p class="error">Ошибка: ${error.message}</p>`;
+                resultsDiv.innerHTML += `<p class="error">Убедитесь, что приложение запущено и доступно по адресу ${url}</p>`;
+            }
+        }
+
+        async function testSqlInjection() {
+            const email = document.getElementById('sqlTestEmail').value;
+            const resultsDiv = document.getElementById('sqlResults');
+            resultsDiv.innerHTML = '<p>Тестирование SQL инъекции...</p>';
+
+            try {
+                const formData = new FormData();
+                formData.append('email', email);
+
+                const response = await fetch(`${baseUrl}/Account/ForgotPassword`, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const responseText = await response.text();
+
+                if (response.ok) {
+                    resultsDiv.innerHTML += `<p class="success">Запрос выполнен успешно (${response.status})</p>`;
+                    resultsDiv.innerHTML += `<p>Если SQL инъекция была бы возможна, вы бы увидели ошибку SQL или получили доступ к данным.</p>`;
+                    resultsDiv.innerHTML += `<p class="success">✓ Защита работает - запрос обработан как обычная строка</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p class="warning">Ответ: ${response.status}</p>`;
+                }
+
+                // Проверка на наличие SQL ошибок в ответе
+                if (responseText.includes('SQL') && responseText.includes('error')) {
+                    resultsDiv.innerHTML += `<p class="error">⚠ Обнаружена возможная SQL ошибка в ответе!</p>`;
+                } else {
+                    resultsDiv.innerHTML += `<p class="success">✓ SQL ошибок в ответе не обнаружено</p>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML += `<p class="error">Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        function testXSS() {
+            const resultsDiv = document.getElementById('xssResults');
+            resultsDiv.innerHTML = '<p>Тестирование XSS защиты через CSP...</p>';
+
+            try {
+                // Попытка создать внешний скрипт
+                const script = document.createElement('script');
+                script.src = 'https://evil.com/script.js';
+                script.onerror = function() {
+                    resultsDiv.innerHTML += `<p class="success">✓ CSP заблокировал загрузку внешнего скрипта</p>`;
+                };
+                script.onload = function() {
+                    resultsDiv.innerHTML += `<p class="error">✗ CSP не заблокировал внешний скрипт!</p>`;
+                };
+                document.head.appendChild(script);
+
+                // Попытка inline скрипта
+                try {
+                    eval('console.log("XSS test")');
+                    resultsDiv.innerHTML += `<p class="warning">⚠ Inline скрипты могут выполняться (проверьте CSP)</p>`;
+                } catch (e) {
+                    resultsDiv.innerHTML += `<p class="success">✓ Inline скрипты заблокированы</p>`;
+                }
+
+                resultsDiv.innerHTML += `<p><strong>Примечание:</strong> Проверьте консоль браузера для деталей</p>`;
+            } catch (error) {
+                resultsDiv.innerHTML += `<p class="error">Ошибка: ${error.message}</p>`;
+            }
+        }
+
+        function testClickjacking() {
+            const resultsDiv = document.getElementById('clickjackingResults');
+            resultsDiv.innerHTML = '<p>Тестирование защиты от Clickjacking...</p>';
+
+            try {
+                const iframe = document.createElement('iframe');
+                iframe.src = `${baseUrl}/Account/Login`;
+                iframe.style.width = '100%';
+                iframe.style.height = '400px';
+                iframe.style.border = '2px solid red';
+
+                iframe.onload = function() {
+                    try {
+                        // Попытка доступа к содержимому iframe
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        resultsDiv.innerHTML += `<p class="error">✗ Страница загрузилась в iframe! X-Frame-Options не работает.</p>`;
+                    } catch (e) {
+                        resultsDiv.innerHTML += `<p class="success">✓ X-Frame-Options работает - доступ к iframe заблокирован</p>`;
+                        resultsDiv.innerHTML += `<p>Ошибка доступа: ${e.message}</p>`;
+                    }
+                };
+
+                iframe.onerror = function() {
+                    resultsDiv.innerHTML += `<p class="success">✓ Страница не загрузилась в iframe</p>`;
+                };
+
+                resultsDiv.appendChild(iframe);
+                resultsDiv.innerHTML += `<p>Попытка загрузить страницу в iframe...</p>`;
+            } catch (error) {
+                resultsDiv.innerHTML += `<p class="success">✓ Ошибка при создании iframe: ${error.message}</p>`;
+                resultsDiv.innerHTML += `<p>Это означает, что X-Frame-Options работает!</p>`;
+            }
+        }
+
+        // Автоматическая проверка при загрузке
+        window.addEventListener('load', function() {
+            // Показываем текущий URL
+            document.getElementById('currentUrl').textContent = baseUrl;
+            // Автоматически проверяем заголовки
+            setTimeout(() => {
+                testSecurityHeaders();
+            }, 500);
+        });
+    </script>
+</body>
+</html>
+

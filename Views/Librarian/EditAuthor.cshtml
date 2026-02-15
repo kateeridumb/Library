@@ -1,0 +1,44 @@
+@model Author
+@{
+    ViewBag.Title = "Редактировать автора";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="custom-card">
+                <div class="custom-card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit me-2"></i>Редактировать автора
+                    </h5>
+                </div>
+                <div class="custom-card-body">
+                    <form asp-action="EditAuthor" method="post">
+                        <input type="hidden" asp-for="AuthorID" />
+
+                        <div class="mb-3">
+                            <label class="form-label">Имя</label>
+                            <input asp-for="FirstName" class="form-control" required />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Фамилия</label>
+                            <input asp-for="LastName" class="form-control" required />
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a asp-action="AuthorManagement" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Назад
+                            </a>
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-save"></i> Сохранить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

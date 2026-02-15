@@ -1,0 +1,54 @@
+@model LibraryMPT.Models.Subscription
+
+@{
+    ViewBag.Title = "Удалить подписку";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="custom-card">
+                <div class="custom-card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Удаление подписки
+                    </h5>
+                </div>
+                <div class="custom-card-body">
+                    <p class="text-danger">
+                        Вы уверены, что хотите удалить эту подписку?
+                    </p>
+
+                    <dl class="row">
+                        <dt class="col-sm-4">Название:</dt>
+                        <dd class="col-sm-8">@Model.Name</dd>
+
+                        <dt class="col-sm-4">Учебное заведение:</dt>
+                        <dd class="col-sm-8">@(Model.Faculty?.FacultyName ?? "Не указано")</dd>
+
+                        <dt class="col-sm-4">Дата начала:</dt>
+                        <dd class="col-sm-8">@(Model.StartDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</dd>
+
+                        <dt class="col-sm-4">Дата окончания:</dt>
+                        <dd class="col-sm-8">@(Model.EndDate?.ToString("dd.MM.yyyy HH:mm") ?? "-")</dd>
+                    </dl>
+
+                    <form asp-action="Delete" method="post">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" asp-for="SubscriptionID" />
+
+                        <div class="d-flex justify-content-end gap-2">
+                            <a asp-action="Index" class="btn btn-secondary">
+                                Отмена
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash me-1"></i> Удалить
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+

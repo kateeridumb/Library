@@ -1,0 +1,54 @@
+﻿@model IEnumerable<LibraryMPT.Models.Book>
+
+@{
+    ViewBag.Title = "Прочитанные книги";
+    Layout = "_Layout";
+}
+
+<div class="container fade-in">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <i class="fas fa-check-circle text-success me-2"></i>
+            Прочитанные книги
+        </h1>
+
+        <a asp-controller="Client"
+           asp-action="Index"
+           class="btn btn-outline-secondary">
+            ← В каталог
+        </a>
+    </div>
+
+    <form method="get" class="mb-4">
+        <div class="input-group">
+            <input type="text"
+                   name="search"
+                   class="form-control"
+                   placeholder="Поиск по названию или описанию"
+                   value="@ViewBag.Search" />
+
+            <button class="btn btn-primary">
+                <i class="fas fa-search"></i>
+            </button>
+        </div>
+    </form>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info text-center">
+            <i class="fas fa-book-open me-2"></i>
+            Вы ещё не отметили ни одной книги как прочитанную
+        </div>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+            @foreach (var book in Model)
+            {
+                @await Html.PartialAsync("_BookCard", book)
+            }
+        </div>
+    }
+
+</div>

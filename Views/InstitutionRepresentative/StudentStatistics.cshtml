@@ -1,0 +1,362 @@
+@model List<LibraryMPT.Models.StudentStatsDto>
+
+@{
+    ViewBag.Title = "Статистика студентов";
+    Layout = "_Layout";
+    string? search = ViewBag.Search as string;
+    string sortBy = ViewBag.SortBy as string ?? "downloads";
+    string sortDir = ViewBag.SortDir as string ?? "desc";
+}
+
+<div class="container fade-in">
+    
+    <div class="page-header-modern mb-5">
+        <div class="header-content">
+            <h1 class="page-title">
+                <i class="fas fa-user-graduate me-3"></i>Статистика студентов
+            </h1>
+            <p class="page-subtitle">Детальная статистика активности студентов вашего учебного заведения</p>
+        </div>
+        <a asp-action="Index" class="btn btn-back">
+            <i class="fas fa-arrow-left me-2"></i>Назад
+        </a>
+    </div>
+
+    @if (ViewBag.Faculty != null)
+    {
+        <div class="faculty-info-card mb-4">
+            <i class="fas fa-university"></i>
+            <div>
+                <strong>Учебное заведение</strong>
+                <p class="mb-0">@ViewBag.Faculty.FacultyName</p>
+            </div>
+        </div>
+    }
+
+    @if (!Model.Any())
+    {
+        <div class="empty-state">
+            <i class="fas fa-user-slash"></i>
+            <h4>Нет данных о студентах</h4>
+            <p>В вашем учебном заведении пока нет студентов или нет активности</p>
+        </div>
+    }
+    else
+    {
+        
+        <div class="summary-stats mb-5">
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern blue">
+                    <i class="fas fa-download"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Sum(s => s.TotalDownloads)</div>
+                    <div class="stat-label">Всего скачиваний</div>
+                </div>
+            </div>
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern green">
+                    <i class="fas fa-book-reader"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Sum(s => s.TotalReads)</div>
+                    <div class="stat-label">Всего прочтений</div>
+                </div>
+            </div>
+            <div class="summary-stat-card">
+                <div class="stat-icon-modern purple">
+                    <i class="fas fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <div class="stat-value">@Model.Count</div>
+                    <div class="stat-label">Активных студентов</div>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <form method="get" class="row g-3 align-items-end">
+                    <div class="col-md-6">
+                        <label class="form-label">Поиск</label>
+                        <input type="text" name="search" class="form-control"
+                               value="@search" placeholder="Имя, фамилия или логин">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Сортировка</label>
+                        <select name="sortBy" class="form-select">
+                            <option value="downloads" selected="@(sortBy == "downloads")">Скачивания</option>
+                            <option value="reads" selected="@(sortBy == "reads")">Прочтения</option>
+                            <option value="books" selected="@(sortBy == "books")">Книг прочитано</option>
+                            <option value="last" selected="@(sortBy == "last")">Последняя активность</option>
+                            <option value="name" selected="@(sortBy == "name")">Фамилия</option>
+                            <option value="user" selected="@(sortBy == "user")">Логин</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Направление</label>
+                        <select name="sortDir" class="form-select">
+                            <option value="desc" selected="@(sortDir == "desc")">По убыванию</option>
+                            <option value="asc" selected="@(sortDir == "asc")">По возрастанию</option>
+                        </select>
+                    </div>
+                    <div class="col-12 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i> Применить
+                        </button>
+                        <a asp-action="StudentStatistics" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Сброс
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="table-card">
+            <div class="table-header">
+                <h5 class="mb-0"><i class="fas fa-list me-2"></i>Детальная статистика</h5>
+            </div>
+            <div class="table-responsive">
+                <table class="table-modern">
+                    <thead>
+                        <tr>
+                            <th>Студент</th>
+                            <th>Логин</th>
+                            <th class="text-center">Скачиваний</th>
+                            <th class="text-center">Прочтений</th>
+                            <th class="text-center">Книг прочитано</th>
+                            <th>Последняя активность</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var student in Model)
+                        {
+                            <tr>
+                                <td>
+                                    <div class="student-info">
+                                        <div class="student-avatar">
+                                            <i class="fas fa-user"></i>
+                                        </div>
+                                        <div>
+                                            <strong>@student.FirstName @student.LastName</strong>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="username-badge">@student.Username</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge downloads">@student.TotalDownloads</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge reads">@student.TotalReads</span>
+                                </td>
+                                <td class="text-center">
+                                    <span class="stat-badge books">@student.TotalBooksRead</span>
+                                </td>
+                                <td>
+                                    @if (student.LastActivityDate.HasValue)
+                                    {
+                                        <span class="activity-date">
+                                            <i class="fas fa-clock me-1"></i>
+                                            @student.LastActivityDate.Value.ToString("dd.MM.yyyy HH:mm")
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">Нет активности</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+@section Styles {
+    <style>
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .summary-stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-icon-modern {
+            width: 60px;
+            height: 60px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            color: white;
+            flex-shrink: 0;
+        }
+
+        .stat-icon-modern.blue {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+
+        .stat-icon-modern.green {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+
+        .stat-icon-modern.purple {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-medium);
+            font-weight: 500;
+        }
+
+        
+        .table-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-medium) 100%);
+            color: white;
+            padding: 1.25rem 1.5rem;
+        }
+
+        .table-modern {
+            width: 100%;
+            margin: 0;
+        }
+
+        .table-modern thead {
+            background: var(--primary-lightest);
+        }
+
+        .table-modern thead th {
+            padding: 1rem 1.5rem;
+            font-weight: 600;
+            color: var(--primary-dark);
+            border-bottom: 2px solid var(--primary-light);
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+
+        .table-modern tbody tr {
+            transition: all 0.2s ease;
+            border-bottom: 1px solid var(--primary-lightest);
+        }
+
+        .table-modern tbody tr:hover {
+            background: var(--primary-lightest);
+            transform: scale(1.01);
+        }
+
+        .table-modern tbody td {
+            padding: 1.25rem 1.5rem;
+            vertical-align: middle;
+        }
+
+        .student-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .student-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .username-badge {
+            background: var(--primary-lightest);
+            color: var(--primary-dark);
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .stat-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .stat-badge.downloads {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+
+        .stat-badge.reads {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+        }
+
+        .stat-badge.books {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            color: white;
+        }
+
+        .activity-date {
+            color: var(--text-medium);
+            font-size: 0.9rem;
+        }
+
+        @@media (max-width: 768px) {
+            .summary-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .table-modern {
+                font-size: 0.9rem;
+            }
+
+            .table-modern thead th,
+            .table-modern tbody td {
+                padding: 0.75rem 1rem;
+            }
+        }
+    </style>
+}
+

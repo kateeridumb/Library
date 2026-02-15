@@ -1,0 +1,170 @@
+@{
+    ViewBag.Title = "Резервное копирование БД";
+    Layout = "_Layout";
+    var backupFiles = ViewBag.BackupFiles as List<(string Name, DateTime Date, long Size, string FullPath)> ?? new List<(string, DateTime, long, string)>();
+    var backupDir = ViewBag.BackupDir as string ?? "";
+}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-database text-primary me-2"></i>Резервное копирование базы данных
+        </h2>
+        <a asp-action="Index" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-2"></i>Назад к панели
+        </a>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+        
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="fas fa-plus-circle fa-4x text-success"></i>
+                    </div>
+                    <h4 class="card-title">Создать бэкап</h4>
+                    <p class="text-muted mb-4">
+                        Создать полную резервную копию базы данных ElectronicLibraryv5
+                    </p>
+                    <form asp-action="CreateBackup" method="post">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-success btn-lg px-4"
+                                onclick="this.innerHTML='<i class=\'fas fa-spinner fa-spin me-2\'></i>Создание...'; this.disabled=true; this.form.submit();">
+                            <i class="fas fa-save me-2"></i>Создать бэкап
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        
+        <div class="col-md-8">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Информация</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex align-items-start">
+                            <i class="fas fa-check text-success me-3 mt-1"></i>
+                            <div>
+                                <strong>Полный бэкап</strong>
+                                <p class="mb-0 text-muted small">Включает все таблицы, данные, индексы и хранимые процедуры</p>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-start">
+                            <i class="fas fa-check text-success me-3 mt-1"></i>
+                            <div>
+                                <strong>Автоматическое именование</strong>
+                                <p class="mb-0 text-muted small">Файлы сохраняются с датой и временем создания</p>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-start">
+                            <i class="fas fa-folder text-primary me-3 mt-1"></i>
+                            <div>
+                                <strong>Папка бэкапов</strong>
+                                <p class="mb-0 text-muted small"><code>@backupDir</code></p>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-start">
+                            <i class="fas fa-exclamation-triangle text-warning me-3 mt-1"></i>
+                            <div>
+                                <strong>Восстановление</strong>
+                                <p class="mb-0 text-muted small">При восстановлении все текущие данные будут заменены данными из бэкапа</p>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="card mt-4 shadow-sm border-0">
+        <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-list me-2"></i>Существующие бэкапы</h5>
+            <span class="badge bg-light text-dark">@backupFiles.Count файл(ов)</span>
+        </div>
+        <div class="card-body p-0">
+            @if (backupFiles.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th><i class="fas fa-file-archive me-2"></i>Имя файла</th>
+                                <th><i class="fas fa-calendar me-2"></i>Дата создания</th>
+                                <th><i class="fas fa-weight me-2"></i>Размер</th>
+                                <th class="text-end">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var file in backupFiles)
+                            {
+                                var sizeInMb = file.Size / (1024.0 * 1024.0);
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-database text-primary me-2"></i>
+                                        <code>@file.Name</code>
+                                    </td>
+                                    <td>@file.Date.ToString("dd.MM.yyyy HH:mm:ss")</td>
+                                    <td>@sizeInMb.ToString("F2") МБ</td>
+                                    <td class="text-end">
+                                        <div class="btn-group">
+                                            <a asp-action="DownloadBackup" asp-route-fileName="@file.Name" 
+                                               class="btn btn-outline-primary btn-sm" title="Скачать">
+                                                <i class="fas fa-download"></i>
+                                            </a>
+                                            <form asp-action="RestoreBackup" method="post" class="d-inline"
+                                                  onsubmit="return confirm('⚠️ ВНИМАНИЕ!\n\nВосстановление из бэкапа заменит ВСЕ текущие данные!\n\nПродолжить?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="fileName" value="@file.Name" />
+                                                <button type="submit" class="btn btn-outline-warning btn-sm" title="Восстановить">
+                                                    <i class="fas fa-undo"></i>
+                                                </button>
+                                            </form>
+                                            <form asp-action="DeleteBackup" method="post" class="d-inline"
+                                                  onsubmit="return confirm('Удалить этот бэкап?');">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="fileName" value="@file.Name" />
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="text-center py-5">
+                    <i class="fas fa-folder-open fa-4x text-muted mb-3"></i>
+                    <h5 class="text-muted">Бэкапы не найдены</h5>
+                    <p class="text-muted">Создайте первый бэкап базы данных</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+

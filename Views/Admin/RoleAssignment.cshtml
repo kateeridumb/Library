@@ -1,0 +1,69 @@
+﻿@model List<LibraryMPT.Models.UserAdminDto>
+@using LibraryMPT.Models
+@{
+    ViewBag.Title = "Управление ролями";
+    Layout = "_Layout";
+    var roles = ViewBag.Roles as List<Role> ?? new List<Role>();
+    int? currentUserId = ViewBag.CurrentUserId as int?;
+}
+
+<h2 class="mb-4">Управление ролями пользователей</h2>
+
+<table class="table table-striped align-middle">
+    <thead>
+        <tr>
+            <th>Email</th>
+            <th>Текущая роль</th>
+            <th>Факультет</th>
+            <th style="width: 250px;">Новая роль</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var u in Model)
+        {
+            var isCurrentUser = currentUserId.HasValue && u.UserID == currentUserId.Value;
+            <tr>
+                <td>@u.Email</td>
+                <td>@u.RoleName</td>
+                <td>@(u.FacultyName ?? "—")</td>
+
+                <td>
+                    @if (isCurrentUser)
+                    {
+                        <span class="text-muted">— нельзя изменить свою роль</span>
+                    }
+                    else
+                    {
+                        <form asp-action="UpdateUserRole" method="post" class="d-flex gap-2">
+                            @Html.AntiForgeryToken()
+
+                            <input type="hidden" name="userId" value="@u.UserID" />
+
+                            <select name="roleId" class="form-select form-select-sm">
+                                @foreach (var role in roles)
+                                {
+                                    if (role.RoleID == u.RoleID)
+                                    {
+                                        <option value="@role.RoleID" selected="selected">@role.RoleName</option>
+                                    }
+                                    else
+                                    {
+                                        <option value="@role.RoleID">@role.RoleName</option>
+                                    }
+                                }
+                            </select>
+
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                💾
+                            </button>
+                        </form>
+                    }
+                </td>
+
+
+                <td></td>
+            </tr>
+        }
+    </tbody>
+</table>

@@ -1,0 +1,410 @@
+﻿@{
+    ViewBag.Title = "Библиотечная система МПТ";
+    Layout = "_Layout";
+
+    bool isAuth = User?.Identity?.IsAuthenticated ?? false;
+    int totalUsers = ViewBag.TotalUsers as int? ?? 0;
+    int totalBooks = ViewBag.TotalBooks as int? ?? 0;
+    int downloads = ViewBag.Downloads as int? ?? 0;
+    int availability = ViewBag.Availability as int? ?? 0;
+    string? guideUrl = null;
+    string? guideLabel = null;
+
+    if (isAuth && User?.Identity != null)
+    {
+        if (User.IsInRole("Admin"))
+        {
+            guideUrl = Url.Content("/books/guides-admin.pdf");
+            guideLabel = "Руководство для администратора";
+        }
+        else if (User.IsInRole("Librarian"))
+        {
+            guideUrl = Url.Content("/books/guides-librarian.pdf");
+            guideLabel = "Руководство для библиотекаря";
+        }
+        else if (User.IsInRole("Student"))
+        {
+            guideUrl = Url.Content("/books/guides-student.pdf");
+            guideLabel = "Руководство для студента";
+        }
+        else if (User.IsInRole("InstitutionRepresentative"))
+        {
+            guideUrl = Url.Content("/books/guide-insr.pdf");
+            guideLabel = "Руководство для представителя";
+        }
+    }
+}
+
+<div class="container fade-in">
+
+    <div class="hero-section text-center mb-5 shadow-sm">
+        <div class="hero-icon mb-4">
+            <div class="book-animation">
+                <i class="fas fa-book-open fa-4x text-gradient"></i>
+            </div>
+        </div>
+
+        <h1 class="display-4 fw-bold mb-3">
+            @if (isAuth)
+            {
+                <span>Добро пожаловать в библиотеку МПТ! 📚</span>
+            }
+            else
+            {
+                <span>Библиотечная система МПТ</span>
+            }
+        </h1>
+
+        <p class="lead text-muted mb-4">
+            @if (isAuth)
+            {
+                <span>Откройте для себя мир знаний и литературы. Тысячи книг ждут вас!</span>
+            }
+            else
+            {
+                <span>Единая платформа для управления библиотечными ресурсами разных учебных заведений</span>
+            }
+        </p>
+
+        @if (!isAuth)
+        {
+            <div class="d-flex justify-content-center gap-3 mb-4">
+                <a asp-controller="Account" asp-action="Login"
+                   class="btn btn-primary-custom btn-lg px-5">
+                    <i class="fas fa-sign-in-alt me-2"></i>Войти
+                </a>
+
+                <a asp-controller="Account" asp-action="Register"
+                   class="btn btn-light-custom btn-lg px-5">
+                    <i class="fas fa-user-plus me-2"></i>Регистрация
+                </a>
+
+                <form asp-controller="Account" asp-action="GuestLogin" method="post" class="d-inline">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="btn btn-outline-secondary btn-lg px-5">
+                        <i class="fas fa-user me-2"></i>Гостевой вход
+                    </button>
+                </form>
+            </div>
+        }
+
+        @if (isAuth)
+        {
+            <div class="welcome-message mt-4">
+                <div class="row g-3 justify-content-center">
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fas fa-search fa-2x mb-2 text-primary"></i>
+                            <h5>Поиск книг</h5>
+                            <p class="small text-muted">Найдите нужную книгу за секунды</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fas fa-download fa-2x mb-2 text-success"></i>
+                            <h5>Скачивание</h5>
+                            <p class="small text-muted">Читайте книги в удобном формате</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="feature-box">
+                            <i class="fas fa-star fa-2x mb-2 text-warning"></i>
+                            <h5>История чтения</h5>
+                            <p class="small text-muted">Отслеживайте прочитанные книги</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (isAuth)
+    {
+        <div class="custom-card mb-5">
+            <div class="custom-card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-bolt me-2"></i>Быстрые действия
+                </h4>
+            </div>
+
+            <div class="custom-card-body">
+                <div class="row g-3">
+
+                    @if (User?.Identity != null && User.IsInRole("Admin"))
+                    {
+                        <div class="col-md-4">
+                            <a asp-controller="Admin" asp-action="Index"
+                               class="action-tile bg-danger-soft">
+                                <i class="fas fa-user-shield fa-2x"></i>
+                                <h5>Администрирование</h5>
+                                <p>Пользователи, роли, аудит</p>
+                            </a>
+                        </div>
+                    }
+
+                    @if (User?.Identity != null && User.IsInRole("Librarian"))
+                    {
+                        <div class="col-md-4">
+                            <a asp-controller="Librarian" asp-action="Index"
+                               class="action-tile bg-primary-soft">
+                                <i class="fas fa-books fa-2x"></i>
+                                <h5>Каталог книг</h5>
+                                <p>Добавление и редактирование</p>
+                            </a>
+                        </div>
+                    }
+
+                    @if (User.IsInRole("Student"))
+                    {
+                        <div class="col-md-4">
+                            <a asp-controller="Client" asp-action="Index"
+                               class="action-tile bg-warning-soft">
+                                <i class="fas fa-book-reader fa-2x"></i>
+                                <h5>Каталог библиотеки</h5>
+                                <p>Поиск и просмотр книг</p>
+                            </a>
+                        </div>
+
+                        <div class="col-md-4">
+                            <a asp-controller="Client" asp-action="Readed"
+                               class="action-tile bg-success-soft">
+                                <i class="fas fa-star fa-2x"></i>
+                                <h5>Прочитанные книги</h5>
+                                <p>История вашего чтения</p>
+                            </a>
+                        </div>
+                    }
+
+                    @if (User.IsInRole("InstitutionRepresentative"))
+                    {
+                        <div class="col-md-4">
+                            <a asp-controller="InstitutionRepresentative" asp-action="Index"
+                               class="action-tile bg-info-soft">
+                                <i class="fas fa-university fa-2x"></i>
+                                <h5>Панель представителя</h5>
+                                <p>Управление подписками и статистика</p>
+                            </a>
+                        </div>
+
+                        <div class="col-md-4">
+                            <a asp-controller="InstitutionRepresentative" asp-action="Subscriptions"
+                               class="action-tile bg-primary-soft">
+                                <i class="fas fa-id-card fa-2x"></i>
+                                <h5>Подписки</h5>
+                                <p>Управление подписками</p>
+                            </a>
+                        </div>
+
+                        <div class="col-md-4">
+                            <a asp-controller="InstitutionRepresentative" asp-action="StudentStatistics"
+                               class="action-tile bg-success-soft">
+                                <i class="fas fa-chart-bar fa-2x"></i>
+                                <h5>Статистика студентов</h5>
+                                <p>Активность студентов</p>
+                            </a>
+                        </div>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(guideUrl))
+                    {
+                        <div class="col-md-4">
+                            <a href="@guideUrl" target="_blank" class="action-tile bg-primary-soft">
+                                <i class="fas fa-file-pdf fa-2x"></i>
+                                <h5>Руководство пользователя</h5>
+                                <p>@guideLabel</p>
+                            </a>
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (isAuth && User.IsInRole("Student"))
+    {
+        <div class="custom-card mb-5">
+            <div class="custom-card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>Двухфакторная аутентификация
+                </h4>
+            </div>
+            <div class="custom-card-body">
+                @{
+                    bool isTwoFactorEnabled = ViewBag.IsTwoFactorEnabled as bool? ?? false;
+                }
+
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h5 class="mb-2">
+                            @if (isTwoFactorEnabled)
+                            {
+                                <span class="text-success">
+                                    <i class="fas fa-check-circle me-2"></i>Двухфакторная аутентификация включена
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">
+                                    <i class="fas fa-times-circle me-2"></i>Двухфакторная аутентификация отключена
+                                </span>
+                            }
+                        </h5>
+                        <p class="text-muted mb-0">
+                            @if (isTwoFactorEnabled)
+                            {
+                                <span>При входе в систему вам будет отправлен код подтверждения на ваш email Gmail.</span>
+                            }
+                            else
+                            {
+                                <span>Включите двухфакторную аутентификацию для дополнительной защиты вашего аккаунта. Коды будут отправляться на ваш email Gmail.</span>
+                            }
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        @if (isTwoFactorEnabled)
+                        {
+                            <form asp-controller="Account" asp-action="DisableTwoFactor" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-outline-danger">
+                                    <i class="fas fa-ban me-2"></i>Отключить
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <form asp-controller="Account" asp-action="EnableTwoFactor" method="post" class="d-inline">
+                                @Html.AntiForgeryToken()
+                                <button type="submit" class="btn btn-primary-custom">
+                                    <i class="fas fa-shield-alt me-2"></i>Включить
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row mt-4 g-3">
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card text-center">
+                <i class="fas fa-users fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@totalUsers</div>
+                <div class="stat-label">Пользователей</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card text-center">
+                <i class="fas fa-book fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@totalBooks</div>
+                <div class="stat-label">Книг в каталоге</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card text-center">
+                <i class="fas fa-download fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@downloads</div>
+                <div class="stat-label">Загрузок</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6 mb-4">
+            <div class="stat-card text-center">
+                <i class="fas fa-chart-line fa-2x mb-3 text-primary-medium"></i>
+                <div class="stat-number">@($"{availability}%")</div>
+                <div class="stat-label">Доступность</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-lightest) 0%, white 100%);
+            border-radius: 20px;
+            padding: 3rem 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(4, 72, 87, 0.05) 0%, transparent 70%);
+            animation: rotate 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero-section > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        @@keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .book-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @@keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+        }
+
+        .feature-box {
+            padding: 1.5rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .feature-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+        }
+
+        .action-tile {
+            display: block;
+            text-align: center;
+            padding: 2rem;
+            border-radius: 16px;
+            transition: .3s;
+            color: var(--primary-dark);
+            text-decoration: none;
+        }
+
+            .action-tile:hover {
+                transform: translateY(-6px);
+                box-shadow: 0 12px 25px rgba(0,0,0,.15);
+            }
+    </style>
+}

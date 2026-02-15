@@ -1,0 +1,119 @@
+﻿@model LibraryMPT.Models.Book
+@{
+    var readed = ViewBag.ReadedBookIds as List<int>;
+    bool isReadedPage = ViewBag.IsReadedPage ?? false;
+    bool hasSubscription = ViewBag.HasSubscription ?? false;
+    bool isGuest = User.IsInRole("Guest");
+}
+
+<div class="col">
+    <div class="book-card custom-card h-100">
+        <div class="book-cover">
+            <img src="@Model.ImagePath"
+                 class="img-fluid rounded"
+                 alt="@Model.Title" />
+
+        </div>
+
+        <div class="custom-card-body">
+            <h5 class="book-title">@Model.Title</h5>
+
+            <p class="book-author">
+                <i class="fas fa-user-pen me-2"></i>
+                @if (Model.Author != null)
+                {
+                    @($"{Model.Author.FirstName} {Model.Author.LastName}")
+                }
+                else
+                {
+                    <span class="text-muted">Автор не указан</span>
+                }
+            </p>
+
+            <div class="book-meta mb-3">
+                @if (Model.Category != null)
+                {
+                    <span class="badge bg-primary-soft text-primary-dark me-2">
+                        <i class="fas fa-tag"></i> @Model.Category.CategoryName
+                    </span>
+                }
+
+                @if (Model.PublishYear.HasValue)
+                {
+                    <span class="text-muted">
+                        <i class="fas fa-calendar me-1"></i>@Model.PublishYear
+                    </span>
+                }
+            </div>
+
+            <div class="d-grid gap-2 mb-2">
+                <a href="@Url.Action("BookDetails", "Client", new { id = Model.BookID })"
+                   class="btn btn-primary-custom btn-sm">
+                    <i class="fas fa-eye me-1"></i> Подробнее
+                </a>
+            </div>
+
+            @if (isReadedPage)
+            {
+                <span class="badge bg-success w-100 text-center mb-2">
+                    <i class="fas fa-check"></i> Прочитано
+                </span>
+            }
+            else
+            {
+                @if (readed != null && readed.Contains(Model.BookID))
+                {
+                    <span class="badge bg-success w-100 text-center mb-2">
+                        <i class="fas fa-check"></i> Прочитано
+                    </span>
+                }
+                else if (!isGuest)
+                {
+                    <form asp-controller="Client"
+                          asp-action="MarkAsRead"
+                          method="post"
+                          class="mb-2">
+                        <input type="hidden" name="bookId" value="@Model.BookID" />
+                        <button class="btn btn-outline-success btn-sm w-100">
+                            <i class="fas fa-check-circle"></i> Отметить как прочитанную
+                        </button>
+                    </form>
+                }
+            }
+
+
+
+            @if (!string.IsNullOrEmpty(Model.FilePath))
+            {
+                if (Model.RequiresSubscription && !hasSubscription)
+                {
+                    <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+                        <i class="fas fa-lock"></i> Доступ по подписке
+                    </button>
+                }
+                else if (isGuest)
+                {
+                    <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+                        <i class="fas fa-user"></i> Скачивание недоступно
+                    </button>
+                }
+                else
+                {
+                    <a asp-controller="Client"
+                       asp-action="Download"
+                       asp-route-id="@Model.BookID"
+                       class="btn btn-outline-primary btn-sm w-100">
+                        <i class="fas fa-download me-1"></i>
+                        Скачать книгу
+                    </a>
+                }
+            }
+            else
+            {
+                <button class="btn btn-outline-secondary btn-sm w-100" disabled>
+                    <i class="fas fa-ban"></i> Нет файла
+                </button>
+            }
+        </div>
+    </div>
+</div>
