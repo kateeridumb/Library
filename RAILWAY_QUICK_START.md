@@ -63,8 +63,9 @@ GO
 ### Для LibraryMPT.Api:
 
 1. **"+ New"** → **"GitHub Repo"** → выбери репозиторий
-2. **Root Directory**: `LibraryMPT.Api`
-3. **Variables** (добавь):
+2. **Root Directory**: `/` (корень репозитория)
+3. **Dockerfile Path**: `Dockerfile.api` (или оставь пустым, если используешь `LibraryMPT.Api/Dockerfile`)
+4. **Variables** (добавь):
    ```
    ConnectionStrings__LibraryDb = Server=sqlserver-production.up.railway.app,1433;Database=ElectronicLibraryv5;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True;Encrypt=True;
    JwtSettings__Issuer = LibraryMPT
