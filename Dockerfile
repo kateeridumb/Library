@@ -1,12 +1,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copy solution and project files
+# Copy solution file
 COPY LibraryMPT.sln .
+
+# Copy main project file
 COPY LibraryMPT.csproj .
 
-# Restore dependencies
-RUN dotnet restore
+# Copy API project file (needed for solution restore)
+COPY LibraryMPT.Api/LibraryMPT.Api.csproj ./LibraryMPT.Api/
+
+# Restore dependencies (this will restore both projects in solution)
+RUN dotnet restore LibraryMPT.sln
 
 # Copy everything else
 COPY . .
