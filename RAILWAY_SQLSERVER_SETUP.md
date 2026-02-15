@@ -47,8 +47,8 @@
 
    **Переменная 1:**
    - **Name**: `SA_PASSWORD`
-   - **Value**: `YourStrong@Password123!` (придумай свой сильный пароль)
-   - **Type**: `Plain Text`
+   - **Value**: `3rXz6LHjVJu6xNS` (твой пароль)
+   - **Type**: `Secret` (рекомендуется для безопасности) или `Plain Text`
 
    **Переменная 2:**
    - **Name**: `MSSQL_PID`
@@ -84,9 +84,9 @@
 2. Скопируй **Public Domain** (например: `sqlserver-production.up.railway.app`)
 3. Connection String будет:
    ```
-   Server=sqlserver-production.up.railway.app,1433;Database=ElectronicLibraryv5;User Id=sa;Password=YourStrong@Password123!;TrustServerCertificate=True;Encrypt=True;
+   Server=sqlserver-production.up.railway.app,1433;Database=ElectronicLibraryv5;User Id=sa;Password=3rXz6LHjVJu6xNS;TrustServerCertificate=True;Encrypt=True;
    ```
-   (замени на свой домен и пароль)
+   (замени `sqlserver-production.up.railway.app` на свой Public Domain из Railway)
 
 ## Шаг 9: Подключение через SSMS
 
@@ -94,7 +94,7 @@
 2. **Server name**: `sqlserver-production.up.railway.app,1433`
 3. **Authentication**: SQL Server Authentication
    - **Login**: `sa`
-   - **Password**: значение из переменной `SA_PASSWORD` (которую ты создал в шаге 5)
+   - **Password**: `3rXz6LHjVJu6xNS`
 4. Нажми **Connect**
 
 ## ⚠️ Важные замечания

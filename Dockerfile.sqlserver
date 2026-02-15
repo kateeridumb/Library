@@ -1,21 +1,10 @@
 FROM mcr.microsoft.com/mssql/server:2022-latest
 
-# Accept EULA
 ENV ACCEPT_EULA=Y
-
-# Set SA password (will be overridden by Railway variables)
-ENV SA_PASSWORD=${SA_PASSWORD:-YourStrong@Password123!}
-
-# Use Express edition
+ENV SA_PASSWORD=${SA_PASSWORD}
 ENV MSSQL_PID=Express
 
-# Expose SQL Server port
 EXPOSE 1433
 
-# Healthcheck to ensure SQL Server is running
-HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "${SA_PASSWORD}" -Q "SELECT 1" || exit 1
-
-# Start SQL Server
 CMD ["/opt/mssql/bin/sqlservr"]
 
