@@ -4,8 +4,10 @@ using LibraryMPT.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
+using NpgsqlTypes;
+using System.Text.RegularExpressions;
 
 namespace LibraryMPT.Api.Controllers;
 
@@ -32,20 +34,32 @@ public sealed class ClientApiController : ControllerBase
     public async Task<ActionResult<ClientIndexResponse>> Index([FromQuery] string? search, [FromQuery] int? categoryId)
     {
         var userId = User.GetUserId();
-        var sql = """
-            SELECT *
-            FROM Books
-            WHERE 1 = 1
-        """;
-
-        if (!string.IsNullOrWhiteSpace(search))
-            sql += " AND (Title LIKE '%' + {0} + '%' OR Description LIKE '%' + {0} + '%')";
-
-        if (categoryId.HasValue)
-            sql += " AND CategoryID = {1}";
+        var searchParam = new NpgsqlParameter("@search", NpgsqlTypes.NpgsqlDbType.Text)
+        {
+            Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim()
+        };
+        var categoryParam = new NpgsqlParameter("@categoryId", NpgsqlTypes.NpgsqlDbType.Integer)
+        {
+            Value = categoryId.HasValue ? categoryId.Value : DBNull.Value
+        };
 
         var books = await _context.Books
-            .FromSqlRaw(sql, search ?? (object)DBNull.Value, categoryId ?? (object)DBNull.Value)
+            .FromSqlRaw("""
+                SELECT
+                    bookid AS "BookID",
+                    title AS "Title",
+                    description AS "Description",
+                    publishyear AS "PublishYear",
+                    categoryid AS "CategoryID",
+                    authorid AS "AuthorID",
+                    publisherid AS "PublisherID",
+                    imagepath AS "ImagePath",
+                    filepath AS "FilePath",
+                    requiressubscription AS "RequiresSubscription"
+                FROM books
+                WHERE (@search IS NULL OR title ILIKE '%' || @search || '%' OR description ILIKE '%' || @search || '%')
+                  AND (@categoryId IS NULL OR categoryid = @categoryId)
+            """, searchParam, categoryParam)
             .AsNoTracking()
             .ToListAsync();
 
@@ -56,13 +70,41 @@ public sealed class ClientApiController : ControllerBase
             var publisherIds = books.Where(b => b.PublisherID.HasValue).Select(b => b.PublisherID!.Value).Distinct().ToList();
 
             var authors = authorIds.Any()
-                ? await _context.Authors.Where(a => authorIds.Contains(a.AuthorID)).AsNoTracking().ToListAsync()
+                ? await _context.Authors
+                    .FromSqlRaw($"""
+                        SELECT
+                            authorid AS "AuthorID",
+                            firstname AS "FirstName",
+                            lastname AS "LastName"
+                        FROM authors
+                        WHERE authorid IN ({string.Join(",", authorIds)})
+                    """)
+                    .AsNoTracking()
+                    .ToListAsync()
                 : new List<Author>();
             var categoriesById = categoryIds.Any()
-                ? await _context.Categories.Where(c => categoryIds.Contains(c.CategoryID)).AsNoTracking().ToListAsync()
+                ? await _context.Categories
+                    .FromSqlRaw($"""
+                        SELECT
+                            categoryid AS "CategoryID",
+                            categoryname AS "CategoryName"
+                        FROM categories
+                        WHERE categoryid IN ({string.Join(",", categoryIds)})
+                    """)
+                    .AsNoTracking()
+                    .ToListAsync()
                 : new List<Category>();
             var publishers = publisherIds.Any()
-                ? await _context.Publisher.Where(p => publisherIds.Contains(p.PublisherID)).AsNoTracking().ToListAsync()
+                ? await _context.Publisher
+                    .FromSqlRaw($"""
+                        SELECT
+                            publisherid AS "PublisherID",
+                            publishername AS "PublisherName"
+                        FROM publisher
+                        WHERE publisherid IN ({string.Join(",", publisherIds)})
+                    """)
+                    .AsNoTracking()
+                    .ToListAsync()
                 : new List<Publisher>();
 
             foreach (var book in books)
@@ -73,26 +115,31 @@ public sealed class ClientApiController : ControllerBase
             }
         }
 
-        var categories = await _context.Categories.FromSqlRaw("SELECT * FROM Categories").AsNoTracking().ToListAsync();
+        var categories = await _context.Categories.FromSqlRaw("""
+            SELECT
+                categoryid AS "CategoryID",
+                categoryname AS "CategoryName"
+            FROM categories
+        """).AsNoTracking().ToListAsync();
 
         var facultyId = await _context.Database
             .SqlQuery<int?>($"""
-                SELECT FacultyID AS Value
-                FROM Users
-                WHERE UserID = {userId}
+                SELECT facultyid AS "Value"
+                FROM users
+                WHERE userid = {userId}
             """)
-            .SingleAsync();
+            .SingleOrDefaultAsync();
 
         var hasActiveSubscription = false;
         if (facultyId.HasValue)
         {
             var subCount = await _context.Database
                 .SqlQuery<int>($"""
-                    SELECT COUNT(*) AS Value
+                    SELECT COUNT(*) AS "Value"
                     FROM Subscriptions
                     WHERE FacultyID = {facultyId.Value}
                       AND (Status = 'Approved' OR Status IS NULL)
-                      AND GETDATE() BETWEEN StartDate AND EndDate
+                      AND NOW() BETWEEN StartDate AND EndDate
                 """)
                 .SingleAsync();
             hasActiveSubscription = subCount > 0;
@@ -100,21 +147,21 @@ public sealed class ClientApiController : ControllerBase
 
         var readedBookIds = await _context.Database
             .SqlQuery<int>($"""
-                SELECT DISTINCT BookID AS Value
-                FROM BookLogs
-                WHERE UserID = {userId}
-                  AND ActionType = 'READ'
+                SELECT DISTINCT bookid AS "Value"
+                FROM booklogs
+                WHERE userid = {userId}
+                  AND actiontype = 'READ'
             """)
             .ToListAsync();
 
         var readed = await _context.Database
             .SqlQuery<int>($"""
-                SELECT COUNT(DISTINCT BookID) AS Value
+                SELECT COUNT(DISTINCT BookID) AS "Value"
                 FROM BookLogs
                 WHERE UserID = {userId}
                   AND ActionType = 'READ'
             """)
-            .SingleAsync();
+            .SingleOrDefaultAsync();
 
         return Ok(new ClientIndexResponse
         {
@@ -133,7 +180,21 @@ public sealed class ClientApiController : ControllerBase
     {
         var userId = User.GetUserId();
         var book = await _context.Books
-            .FromSqlRaw("SELECT * FROM Books WHERE BookID = @id", new SqlParameter("@id", id))
+            .FromSqlRaw("""
+                SELECT
+                    bookid AS "BookID",
+                    title AS "Title",
+                    description AS "Description",
+                    publishyear AS "PublishYear",
+                    categoryid AS "CategoryID",
+                    authorid AS "AuthorID",
+                    publisherid AS "PublisherID",
+                    imagepath AS "ImagePath",
+                    filepath AS "FilePath",
+                    requiressubscription AS "RequiresSubscription"
+                FROM books
+                WHERE bookid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
         if (book == null)
@@ -144,37 +205,56 @@ public sealed class ClientApiController : ControllerBase
         if (book.AuthorID > 0)
         {
             book.Author = await _context.Authors
-                .FromSqlRaw("SELECT * FROM Authors WHERE AuthorID = @id", new SqlParameter("@id", book.AuthorID))
+                .FromSqlRaw("""
+                    SELECT
+                        authorid AS "AuthorID",
+                        firstname AS "FirstName",
+                        lastname AS "LastName"
+                    FROM authors
+                    WHERE authorid = @id
+                """, new NpgsqlParameter("@id", book.AuthorID))
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
         }
         if (book.CategoryID > 0)
         {
             book.Category = await _context.Categories
-                .FromSqlRaw("SELECT * FROM Categories WHERE CategoryID = @id", new SqlParameter("@id", book.CategoryID))
+                .FromSqlRaw("""
+                    SELECT
+                        categoryid AS "CategoryID",
+                        categoryname AS "CategoryName"
+                    FROM categories
+                    WHERE categoryid = @id
+                """, new NpgsqlParameter("@id", book.CategoryID))
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
         }
         if (book.PublisherID.HasValue)
         {
             book.Publisher = await _context.Publisher
-                .FromSqlRaw("SELECT * FROM Publisher WHERE PublisherID = @id", new SqlParameter("@id", book.PublisherID.Value))
+                .FromSqlRaw("""
+                    SELECT
+                        publisherid AS "PublisherID",
+                        publishername AS "PublisherName"
+                    FROM publisher
+                    WHERE publisherid = @id
+                """, new NpgsqlParameter("@id", book.PublisherID.Value))
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
         }
 
         var facultyId = await _context.Database
-            .SqlQuery<int?>($"SELECT FacultyID AS Value FROM Users WHERE UserID = {userId}")
-            .SingleAsync();
+            .SqlQuery<int?>($"SELECT FacultyID AS \"Value\" FROM Users WHERE UserID = {userId}")
+            .SingleOrDefaultAsync();
         var hasActiveSubscription = false;
         if (facultyId.HasValue)
         {
             var subCount = await _context.Database.SqlQuery<int>($"""
-                SELECT COUNT(*) AS Value
+                SELECT COUNT(*) AS "Value"
                 FROM Subscriptions
                 WHERE FacultyID = {facultyId.Value}
                   AND (Status = 'Approved' OR Status IS NULL)
-                  AND GETDATE() BETWEEN StartDate AND EndDate
+                  AND NOW() BETWEEN StartDate AND EndDate
             """).SingleAsync();
             hasActiveSubscription = subCount > 0;
         }
@@ -188,8 +268,8 @@ public sealed class ClientApiController : ControllerBase
         var userId = User.GetUserId();
         await _context.Database.ExecuteSqlRawAsync("""
             INSERT INTO BookLogs (UserID, BookID, ActionType, ActionAt)
-            VALUES (@userId, @bookId, 'READ', GETDATE())
-        """, new SqlParameter("@userId", userId), new SqlParameter("@bookId", request.BookId));
+            VALUES (@userId, @bookId, 'READ', NOW())
+        """, new NpgsqlParameter("@userId", userId), new NpgsqlParameter("@bookId", request.BookId));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
@@ -199,9 +279,20 @@ public sealed class ClientApiController : ControllerBase
         var userId = User.GetUserId();
         var book = await _context.Books
             .FromSqlRaw("""
-                SELECT BookID, Title, Description, PublishYear, CategoryID, AuthorID, PublisherID, FilePath, ImagePath, RequiresSubscription
-                FROM Books WHERE BookID = @id
-            """, new SqlParameter("@id", id))
+                SELECT
+                    bookid AS "BookID",
+                    title AS "Title",
+                    description AS "Description",
+                    publishyear AS "PublishYear",
+                    categoryid AS "CategoryID",
+                    authorid AS "AuthorID",
+                    publisherid AS "PublisherID",
+                    filepath AS "FilePath",
+                    imagepath AS "ImagePath",
+                    requiressubscription AS "RequiresSubscription"
+                FROM books
+                WHERE bookid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
         if (book == null)
@@ -212,21 +303,30 @@ public sealed class ClientApiController : ControllerBase
         if (book.AuthorID > 0)
         {
             book.Author = await _context.Authors
-                .FromSqlRaw("SELECT * FROM Authors WHERE AuthorID = @id", new SqlParameter("@id", book.AuthorID))
+                .FromSqlRaw("""
+                    SELECT
+                        authorid AS "AuthorID",
+                        firstname AS "FirstName",
+                        lastname AS "LastName"
+                    FROM authors
+                    WHERE authorid = @id
+                """, new NpgsqlParameter("@id", book.AuthorID))
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
         }
 
-        var facultyId = await _context.Database.SqlQuery<int?>($"SELECT FacultyID AS Value FROM Users WHERE UserID = {userId}").SingleAsync();
+        var facultyId = await _context.Database
+            .SqlQuery<int?>($"SELECT FacultyID AS \"Value\" FROM Users WHERE UserID = {userId}")
+            .SingleOrDefaultAsync();
         var hasActiveSubscription = false;
         if (facultyId.HasValue)
         {
             var subCount = await _context.Database.SqlQuery<int>($"""
-                SELECT COUNT(*) AS Value
+                SELECT COUNT(*) AS "Value"
                 FROM Subscriptions
                 WHERE FacultyID = {facultyId.Value}
                   AND (Status = 'Approved' OR Status IS NULL)
-                  AND GETDATE() BETWEEN StartDate AND EndDate
+                  AND NOW() BETWEEN StartDate AND EndDate
             """).SingleAsync();
             hasActiveSubscription = subCount > 0;
         }
@@ -235,20 +335,20 @@ public sealed class ClientApiController : ControllerBase
         if (canRead)
         {
             var hasReadLog = await _context.Database.SqlQuery<int>($"""
-                SELECT COUNT(*) AS Value
+                SELECT COUNT(*) AS "Value"
                 FROM BookLogs
                 WHERE UserID = {userId}
                   AND BookID = {id}
                   AND ActionType = 'READ'
-                  AND ActionAt >= DATEADD(MINUTE, -5, GETDATE())
+                  AND ActionAt >= NOW() - INTERVAL '5 minutes'
             """).SingleAsync();
 
             if (hasReadLog == 0)
             {
                 await _context.Database.ExecuteSqlRawAsync("""
                     INSERT INTO BookLogs (UserID, BookID, ActionType, ActionAt)
-                    VALUES (@userId, @bookId, 'READ', GETDATE())
-                """, new SqlParameter("@userId", userId), new SqlParameter("@bookId", id));
+                    VALUES (@userId, @bookId, 'READ', NOW())
+                """, new NpgsqlParameter("@userId", userId), new NpgsqlParameter("@bookId", id));
             }
         }
 
@@ -277,8 +377,13 @@ public sealed class ClientApiController : ControllerBase
     {
         var userId = User.GetUserId();
         var book = await _context.Database.SqlQuery<BookDownloadDto>($"""
-            SELECT BookID, Title, FilePath, CAST(CASE WHEN RequiresSubscription = 1 THEN 1 ELSE 0 END AS BIT) AS RequiresSubscription
-            FROM Books WHERE BookID = {id}
+            SELECT
+                bookid AS "BookID",
+                title AS "Title",
+                filepath AS "FilePath",
+                requiressubscription AS "RequiresSubscription"
+            FROM books
+            WHERE bookid = {id}
         """).AsNoTracking().SingleOrDefaultAsync();
 
         if (book == null || string.IsNullOrWhiteSpace(book.FilePath))
@@ -287,17 +392,17 @@ public sealed class ClientApiController : ControllerBase
         if (book.RequiresSubscription)
         {
             var facultyId = await _context.Database.SqlQuery<int?>($"""
-                SELECT FacultyID AS Value FROM Users WHERE UserID = {userId}
-            """).SingleAsync();
+                SELECT FacultyID AS "Value" FROM Users WHERE UserID = {userId}
+            """).SingleOrDefaultAsync();
             var hasActiveSubscription = false;
             if (facultyId.HasValue)
             {
                 var subCount = await _context.Database.SqlQuery<int>($"""
-                    SELECT COUNT(*) AS Value
+                    SELECT COUNT(*) AS "Value"
                     FROM Subscriptions
                     WHERE FacultyID = {facultyId.Value}
                       AND (Status = 'Approved' OR Status IS NULL)
-                      AND GETDATE() BETWEEN StartDate AND EndDate
+                      AND NOW() BETWEEN StartDate AND EndDate
                 """).SingleAsync();
                 hasActiveSubscription = subCount > 0;
             }
@@ -333,8 +438,13 @@ public sealed class ClientApiController : ControllerBase
         var userId = User.GetUserId();
         var isGuest = User.IsInRole("Guest");
         var book = await _context.Database.SqlQuery<BookDownloadDto>($"""
-            SELECT BookID, Title, FilePath, CAST(CASE WHEN RequiresSubscription = 1 THEN 1 ELSE 0 END AS BIT) AS RequiresSubscription
-            FROM Books WHERE BookID = {id}
+            SELECT
+                bookid AS "BookID",
+                title AS "Title",
+                filepath AS "FilePath",
+                requiressubscription AS "RequiresSubscription"
+            FROM books
+            WHERE bookid = {id}
         """).AsNoTracking().SingleOrDefaultAsync();
         if (book == null || string.IsNullOrWhiteSpace(book.FilePath))
             return NotFound();
@@ -342,7 +452,7 @@ public sealed class ClientApiController : ControllerBase
         if (isGuest)
             return BadRequest(new ApiCommandResponse { Success = false, Message = "Гостевой доступ не позволяет скачивать книги." });
         if (book.RequiresSubscription)
-            return BadRequest(new ApiCommandResponse { Success = false, Message = "Книги по подписке доступны только онлайн." });
+            return BadRequest(new ApiCommandResponse { Success = false, Message = "Книга доступна только по подписке вашего учебного заведения." });
 
         var fullPath = ResolveBookFullPath(book.FilePath);
         if (!System.IO.File.Exists(fullPath))
@@ -350,8 +460,8 @@ public sealed class ClientApiController : ControllerBase
 
         await _context.Database.ExecuteSqlRawAsync("""
             INSERT INTO BookLogs (UserID, BookID, ActionType, ActionAt)
-            VALUES (@userId, @bookId, 'DOWNLOAD', GETDATE())
-        """, new SqlParameter("@userId", userId), new SqlParameter("@bookId", id));
+            VALUES (@userId, @bookId, 'DOWNLOAD', NOW())
+        """, new NpgsqlParameter("@userId", userId), new NpgsqlParameter("@bookId", id));
 
         return PhysicalFile(fullPath, "application/octet-stream", Path.GetFileName(fullPath));
     }
@@ -361,7 +471,7 @@ public sealed class ClientApiController : ControllerBase
     {
         var userId = User.GetUserId();
         var readedBookIds = await _context.Database.SqlQuery<int>($"""
-            SELECT DISTINCT BookID AS Value
+            SELECT DISTINCT BookID AS "Value"
             FROM BookLogs
             WHERE UserID = {userId}
               AND ActionType = 'READ'
@@ -372,13 +482,22 @@ public sealed class ClientApiController : ControllerBase
 
         var sql = $"""
             SELECT DISTINCT
-                b.BookID, b.Title, b.Description, b.PublishYear, b.CategoryID, b.AuthorID, b.PublisherID, b.FilePath, b.ImagePath, b.RequiresSubscription
-            FROM Books b
-            WHERE b.BookID IN ({string.Join(",", readedBookIds)})
+                b.bookid AS "BookID",
+                b.title AS "Title",
+                b.description AS "Description",
+                b.publishyear AS "PublishYear",
+                b.categoryid AS "CategoryID",
+                b.authorid AS "AuthorID",
+                b.publisherid AS "PublisherID",
+                b.filepath AS "FilePath",
+                b.imagepath AS "ImagePath",
+                b.requiressubscription AS "RequiresSubscription"
+            FROM books b
+            WHERE b.bookid IN ({string.Join(",", readedBookIds)})
         """;
 
         if (!string.IsNullOrWhiteSpace(search))
-            sql += $" AND (b.Title LIKE '%{search.Replace("'", "''")}%' OR b.Description LIKE '%{search.Replace("'", "''")}%')";
+            sql += $" AND (b.Title ILIKE '%{search.Replace("'", "''")}%' OR b.Description ILIKE '%{search.Replace("'", "''")}%')";
 
         var books = await _context.Books.FromSqlRaw(sql).AsNoTracking().ToListAsync();
         if (books.Any())
@@ -407,10 +526,18 @@ public sealed class ClientApiController : ControllerBase
     {
         var userId = User.GetUserId();
         var bookmarks = await _context.Database.SqlQuery<Bookmark>($"""
-            SELECT BookmarkID, UserID, BookID, Page, Position, Title, Note, CreatedAt
-            FROM Bookmarks
-            WHERE UserID = {userId} AND BookID = {bookId}
-            ORDER BY CreatedAt DESC
+            SELECT
+                bookmarkid AS "BookmarkID",
+                userid AS "UserID",
+                bookid AS "BookID",
+                COALESCE(page::text, '') AS "Page",
+                position AS "Position",
+                title AS "Title",
+                note AS "Note",
+                createdat AS "CreatedAt"
+            FROM bookmarks
+            WHERE userid = {userId} AND bookid = {bookId}
+            ORDER BY createdat DESC
         """).ToListAsync();
         return Ok(bookmarks);
     }
@@ -419,16 +546,17 @@ public sealed class ClientApiController : ControllerBase
     public async Task<ActionResult<ApiCommandResponse>> AddBookmark([FromBody] ClientBookmarkRequest request)
     {
         var userId = User.GetUserId();
+        var parsedPage = ParsePageNumber(request.Bookmark.Page);
         await _context.Database.ExecuteSqlRawAsync("""
-            INSERT INTO Bookmarks (UserID, BookID, Page, Position, Title, Note, CreatedAt)
-            VALUES (@userId, @bookId, @page, @position, @title, @note, GETDATE())
+            INSERT INTO bookmarks (userid, bookid, page, position, title, note, createdat)
+            VALUES (@userId, @bookId, @page, @position, @title, @note, NOW())
         """,
-            new SqlParameter("@userId", userId),
-            new SqlParameter("@bookId", request.Bookmark.BookID),
-            new SqlParameter("@page", (object?)request.Bookmark.Page ?? DBNull.Value),
-            new SqlParameter("@position", (object?)request.Bookmark.Position ?? DBNull.Value),
-            new SqlParameter("@title", (object?)request.Bookmark.Title ?? DBNull.Value),
-            new SqlParameter("@note", (object?)request.Bookmark.Note ?? DBNull.Value));
+            new NpgsqlParameter("@userId", userId),
+            new NpgsqlParameter("@bookId", request.Bookmark.BookID),
+            new NpgsqlParameter("@page", NpgsqlDbType.Integer) { Value = parsedPage.HasValue ? parsedPage.Value : DBNull.Value },
+            new NpgsqlParameter("@position", (object?)request.Bookmark.Position ?? DBNull.Value),
+            new NpgsqlParameter("@title", (object?)request.Bookmark.Title ?? DBNull.Value),
+            new NpgsqlParameter("@note", (object?)request.Bookmark.Note ?? DBNull.Value));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
@@ -439,7 +567,7 @@ public sealed class ClientApiController : ControllerBase
         var deleted = await _context.Database.ExecuteSqlRawAsync("""
             DELETE FROM Bookmarks
             WHERE BookmarkID = @bookmarkId AND UserID = @userId
-        """, new SqlParameter("@bookmarkId", bookmarkId), new SqlParameter("@userId", userId));
+        """, new NpgsqlParameter("@bookmarkId", bookmarkId), new NpgsqlParameter("@userId", userId));
         return Ok(new ApiCommandResponse { Success = deleted > 0 });
     }
 
@@ -447,18 +575,35 @@ public sealed class ClientApiController : ControllerBase
     public async Task<ActionResult<ApiCommandResponse>> UpdateBookmark([FromBody] ClientBookmarkRequest request)
     {
         var userId = User.GetUserId();
+        var parsedPage = ParsePageNumber(request.Bookmark.Page);
         var updated = await _context.Database.ExecuteSqlRawAsync("""
-            UPDATE Bookmarks
-            SET Page = @page, Position = @position, Title = @title, Note = @note
-            WHERE BookmarkID = @bookmarkId AND UserID = @userId
+            UPDATE bookmarks
+            SET page = @page, position = @position, title = @title, note = @note
+            WHERE bookmarkid = @bookmarkId AND userid = @userId
         """,
-            new SqlParameter("@bookmarkId", request.Bookmark.BookmarkID),
-            new SqlParameter("@userId", userId),
-            new SqlParameter("@page", (object?)request.Bookmark.Page ?? DBNull.Value),
-            new SqlParameter("@position", (object?)request.Bookmark.Position ?? DBNull.Value),
-            new SqlParameter("@title", (object?)request.Bookmark.Title ?? DBNull.Value),
-            new SqlParameter("@note", (object?)request.Bookmark.Note ?? DBNull.Value));
+            new NpgsqlParameter("@bookmarkId", request.Bookmark.BookmarkID),
+            new NpgsqlParameter("@userId", userId),
+            new NpgsqlParameter("@page", NpgsqlDbType.Integer) { Value = parsedPage.HasValue ? parsedPage.Value : DBNull.Value },
+            new NpgsqlParameter("@position", (object?)request.Bookmark.Position ?? DBNull.Value),
+            new NpgsqlParameter("@title", (object?)request.Bookmark.Title ?? DBNull.Value),
+            new NpgsqlParameter("@note", (object?)request.Bookmark.Note ?? DBNull.Value));
         return Ok(new ApiCommandResponse { Success = updated > 0 });
+    }
+
+    private static int? ParsePageNumber(string? rawPage)
+    {
+        if (string.IsNullOrWhiteSpace(rawPage))
+        {
+            return null;
+        }
+
+        if (int.TryParse(rawPage, out var direct))
+        {
+            return direct;
+        }
+
+        var match = Regex.Match(rawPage, @"\d+");
+        return match.Success && int.TryParse(match.Value, out var parsed) ? parsed : null;
     }
 
     private string? ResolveBookFullPath(string? filePath)

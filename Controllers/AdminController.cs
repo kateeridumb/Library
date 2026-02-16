@@ -135,32 +135,67 @@ namespace LibraryMPT.Controllers
 
         public async Task<IActionResult> RoleAssignment()
         {
-            ViewBag.CurrentUserId = int.Parse(
-    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value
-            );
+            try
+            {
+                ViewBag.CurrentUserId = int.Parse(
+                    User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value
+                );
 
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await apiClient.GetFromJsonAsync<AdminRoleAssignmentResponse>("api/admin/role-assignment")
-                ?? new AdminRoleAssignmentResponse();
-            ViewBag.Roles = data.Roles;
-            return View(data.Users);
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var response = await apiClient.GetAsync("api/admin/role-assignment");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Не удалось загрузить данные. Попробуйте позже.";
+                    return View(new List<UserAdminDto>());
+                }
+
+                var data = await response.Content.ReadFromJsonAsync<AdminRoleAssignmentResponse>()
+                    ?? new AdminRoleAssignmentResponse();
+                ViewBag.Roles = data.Roles ?? new List<Role>();
+                return View(data.Users ?? new List<UserAdminDto>());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при загрузке назначения ролей");
+                TempData["Error"] = "Произошла ошибка при загрузке данных.";
+                return View(new List<UserAdminDto>());
+            }
         }
 
 
         public async Task<IActionResult> AuditLog(string actionType, string? search, string? sortBy, string? sortDir)
         {
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await apiClient.GetFromJsonAsync<AdminAuditLogResponse>(
-                $"api/admin/audit-log?actionType={Uri.EscapeDataString(actionType ?? string.Empty)}" +
-                $"&search={Uri.EscapeDataString(search ?? string.Empty)}" +
-                $"&sortBy={Uri.EscapeDataString(sortBy ?? string.Empty)}" +
-                $"&sortDir={Uri.EscapeDataString(sortDir ?? string.Empty)}")
-                ?? new AdminAuditLogResponse();
-            ViewBag.ActionType = data.ActionType;
-            ViewBag.Search = data.Search;
-            ViewBag.SortBy = data.SortBy;
-            ViewBag.SortDir = data.SortDir;
-            return View(data.Logs);
+            try
+            {
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var url = $"api/admin/audit-log?actionType={Uri.EscapeDataString(actionType ?? string.Empty)}" +
+                    $"&search={Uri.EscapeDataString(search ?? string.Empty)}" +
+                    $"&sortBy={Uri.EscapeDataString(sortBy ?? string.Empty)}" +
+                    $"&sortDir={Uri.EscapeDataString(sortDir ?? string.Empty)}";
+                
+                var response = await apiClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Не удалось загрузить журнал аудита. Попробуйте позже.";
+                    return View(new List<AuditLog>());
+                }
+
+                var data = await response.Content.ReadFromJsonAsync<AdminAuditLogResponse>()
+                    ?? new AdminAuditLogResponse();
+                ViewBag.ActionType = data.ActionType;
+                ViewBag.Search = data.Search;
+                ViewBag.SortBy = data.SortBy;
+                ViewBag.SortDir = data.SortDir;
+                return View(data.Logs ?? new List<AuditLog>());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при загрузке журнала аудита");
+                TempData["Error"] = "Произошла ошибка при загрузке журнала аудита.";
+                return View(new List<AuditLog>());
+            }
         }
 
 
@@ -244,15 +279,37 @@ namespace LibraryMPT.Controllers
 
         public async Task<IActionResult> EditUser(int id)
         {
+            try
+            {
             var currentUserId = int.Parse(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await apiClient.GetFromJsonAsync<EditUserViewResponse>($"api/admin/users/{id}/edit");
-            if (data?.User == null) return NotFound();
-            ViewBag.DecryptedLastName = data.DecryptedLastName;
-            ViewBag.Roles = data.Roles;
-            ViewBag.Faculties = data.Faculties;
-            ViewBag.CanEditFaculty = data.CanEditFaculty;
-            return View(data.User);
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var response = await apiClient.GetAsync($"api/admin/users/{id}/edit");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Не удалось загрузить данные пользователя.";
+                return RedirectToAction(nameof(UserManagement));
+            }
+
+                var data = await response.Content.ReadFromJsonAsync<EditUserViewResponse>();
+                if (data?.User == null)
+                {
+                    TempData["Error"] = "Пользователь не найден.";
+                    return RedirectToAction(nameof(UserManagement));
+                }
+
+                ViewBag.DecryptedLastName = data.DecryptedLastName;
+                ViewBag.Roles = data.Roles ?? new List<Role>();
+                ViewBag.Faculties = data.Faculties ?? new List<Faculty>();
+                ViewBag.CanEditFaculty = data.CanEditFaculty;
+                return View(data.User);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при загрузке данных пользователя для редактирования");
+                TempData["Error"] = "Произошла ошибка при загрузке данных пользователя.";
+                return RedirectToAction(nameof(UserManagement));
+            }
         }
 
         [HttpPost]
@@ -375,12 +432,30 @@ namespace LibraryMPT.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> UpdateUserRole(int userId, int roleId)
         {
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            await apiClient.PostAsJsonAsync("api/admin/users/update-role", new UpdateUserRoleRequest
+            try
             {
-                UserId = userId,
-                RoleId = roleId
-            });
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var response = await apiClient.PostAsJsonAsync("api/admin/users/update-role", new UpdateUserRoleRequest
+                {
+                    UserId = userId,
+                    RoleId = roleId
+                });
+
+                var payload = await response.Content.ReadFromJsonAsync<ApiCommandResponse>();
+                if (payload?.Success == true)
+                {
+                    TempData["Success"] = "Роль пользователя успешно обновлена.";
+                }
+                else
+                {
+                    TempData["Error"] = payload?.Message ?? "Не удалось обновить роль пользователя.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при обновлении роли пользователя");
+                TempData["Error"] = "Произошла ошибка при обновлении роли пользователя.";
+            }
 
             return RedirectToAction(nameof(RoleAssignment));
         }
@@ -400,13 +475,30 @@ namespace LibraryMPT.Controllers
 
         public async Task<IActionResult> FacultyManagement(string search)
         {
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            var faculties = await apiClient.GetFromJsonAsync<List<Faculty>>(
-                $"api/admin/faculties?search={Uri.EscapeDataString(search ?? string.Empty)}")
-                ?? new List<Faculty>();
+            try
+            {
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var url = $"api/admin/faculties?search={Uri.EscapeDataString(search ?? string.Empty)}";
+                var response = await apiClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Не удалось загрузить факультеты. Попробуйте позже.";
+                    return View(new List<Faculty>());
+                }
+
+                var faculties = await response.Content.ReadFromJsonAsync<List<Faculty>>()
+                    ?? new List<Faculty>();
 
             ViewBag.Search = search;
             return View(faculties);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при загрузке факультетов");
+                TempData["Error"] = "Произошла ошибка при загрузке факультетов.";
+                return View(new List<Faculty>());
+            }
         }
 
         public IActionResult AddFaculty() => View();
@@ -417,13 +509,13 @@ namespace LibraryMPT.Controllers
         {
             if (string.IsNullOrWhiteSpace(faculty.FacultyName))
             {
-                ModelState.AddModelError("", "�������� ���������� �����������");
+                ModelState.AddModelError("", "Название факультета обязательно");
                 return View(faculty);
             }
 
             if (faculty.FacultyName.Length > 200)
             {
-                ModelState.AddModelError("", "�������� ���������� �� ������ ��������� 200 ��������");
+                ModelState.AddModelError("", "Название факультета не должно превышать 200 символов");
                 return View(faculty);
             }
 
@@ -457,13 +549,13 @@ namespace LibraryMPT.Controllers
         {
             if (string.IsNullOrWhiteSpace(faculty.FacultyName))
             {
-                ModelState.AddModelError("", "�������� ���������� �����������");
+                ModelState.AddModelError("", "Название факультета обязательно");
                 return View(faculty);
             }
 
             if (faculty.FacultyName.Length > 200)
             {
-                ModelState.AddModelError("", "�������� ���������� �� ������ ��������� 200 ��������");
+                ModelState.AddModelError("", "Название факультета не должно превышать 200 символов");
                 return View(faculty);
             }
 
@@ -503,13 +595,30 @@ namespace LibraryMPT.Controllers
 
         public async Task<IActionResult> RoleManagement(string search)
         {
-            var apiClient = _httpClientFactory.CreateClient("LibraryApi");
-            var roles = await apiClient.GetFromJsonAsync<List<Role>>(
-                $"api/admin/roles?search={Uri.EscapeDataString(search ?? string.Empty)}")
-                ?? new List<Role>();
+            try
+            {
+                var apiClient = _httpClientFactory.CreateClient("LibraryApi");
+                var url = $"api/admin/roles?search={Uri.EscapeDataString(search ?? string.Empty)}";
+                var response = await apiClient.GetAsync(url);
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    TempData["Error"] = "Не удалось загрузить роли. Попробуйте позже.";
+                    return View(new List<Role>());
+                }
+
+                var roles = await response.Content.ReadFromJsonAsync<List<Role>>()
+                    ?? new List<Role>();
 
             ViewBag.Search = search;
             return View(roles);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Ошибка при загрузке ролей");
+                TempData["Error"] = "Произошла ошибка при загрузке ролей.";
+                return View(new List<Role>());
+            }
         }
 
         public IActionResult AddRole() => View();
@@ -520,19 +629,19 @@ namespace LibraryMPT.Controllers
         {
             if (string.IsNullOrWhiteSpace(role.RoleName))
             {
-                ModelState.AddModelError("", "�������� ���� �����������");
+                ModelState.AddModelError("", "Название роли обязательно");
                 return View(role);
             }
 
             if (role.RoleName.Length > 50)
             {
-                ModelState.AddModelError("", "�������� ���� �� ������ ��������� 50 ��������");
+                ModelState.AddModelError("", "Название роли не должно превышать 50 символов");
                 return View(role);
             }
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(role.RoleName, @"^[A-Za-z�-��-���0-9\s]+$"))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(role.RoleName, @"^[A-Za-zА-Яа-яЁё0-9\s]+$"))
             {
-                ModelState.AddModelError("", "�������� ���� ������ ��������� ������ �����, ����� � �������");
+                ModelState.AddModelError("", "Название роли должно содержать только буквы, цифры и пробелы");
                 return View(role);
             }
 
@@ -566,19 +675,19 @@ namespace LibraryMPT.Controllers
         {
             if (string.IsNullOrWhiteSpace(role.RoleName))
             {
-                ModelState.AddModelError("", "�������� ���� �����������");
+                ModelState.AddModelError("", "Название роли обязательно");
                 return View(role);
             }
 
             if (role.RoleName.Length > 50)
             {
-                ModelState.AddModelError("", "�������� ���� �� ������ ��������� 50 ��������");
+                ModelState.AddModelError("", "Название роли не должно превышать 50 символов");
                 return View(role);
             }
 
-            if (!System.Text.RegularExpressions.Regex.IsMatch(role.RoleName, @"^[A-Za-z�-��-���0-9\s]+$"))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(role.RoleName, @"^[A-Za-zА-Яа-яЁё0-9\s]+$"))
             {
-                ModelState.AddModelError("", "�������� ���� ������ ��������� ������ �����, ����� � �������");
+                ModelState.AddModelError("", "Название роли должно содержать только буквы, цифры и пробелы");
                 return View(role);
             }
 

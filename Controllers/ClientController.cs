@@ -3,7 +3,9 @@ using LibraryMPT.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace LibraryMPT.Controllers
 {
@@ -22,9 +24,28 @@ namespace LibraryMPT.Controllers
         public async Task<IActionResult> Index(string? search, int? categoryId)
         {
             var api = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await api.GetFromJsonAsync<ClientIndexResponse>(
-                $"api/client/index?search={Uri.EscapeDataString(search ?? string.Empty)}&categoryId={(categoryId.HasValue ? categoryId.Value.ToString() : string.Empty)}")
-                ?? new ClientIndexResponse();
+            var requestUri = string.IsNullOrWhiteSpace(search)
+                ? "api/client/index"
+                : $"api/client/index?search={Uri.EscapeDataString(search)}";
+            if (categoryId.HasValue)
+            {
+                requestUri += requestUri.Contains('?')
+                    ? $"&categoryId={categoryId.Value}"
+                    : $"?categoryId={categoryId.Value}";
+            }
+
+            ClientIndexResponse data;
+            try
+            {
+                data = await api.GetFromJsonAsync<ClientIndexResponse>(requestUri)
+                    ?? new ClientIndexResponse();
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Client index API request failed");
+                TempData["Error"] = "Не удалось загрузить список книг. Попробуйте еще раз.";
+                data = new ClientIndexResponse();
+            }
 
             ViewBag.Categories = data.Categories;
             ViewBag.HasSubscription = data.HasSubscription;
@@ -41,7 +62,17 @@ namespace LibraryMPT.Controllers
         public async Task<IActionResult> BookDetails(int id)
         {
             var api = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await api.GetFromJsonAsync<ClientBookDetailsResponse>($"api/client/book-details/{id}");
+            ClientBookDetailsResponse? data = null;
+            try
+            {
+                data = await api.GetFromJsonAsync<ClientBookDetailsResponse>($"api/client/book-details/{id}");
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Client book-details API request failed for bookId={BookId}", id);
+                TempData["Error"] = "Не удалось загрузить информацию о книге.";
+                return RedirectToAction(nameof(Index));
+            }
             if (data?.Book == null)
                 return NotFound();
 
@@ -70,7 +101,17 @@ namespace LibraryMPT.Controllers
         public async Task<IActionResult> ReadOnline(int id)
         {
             var api = _httpClientFactory.CreateClient("LibraryApi");
-            var data = await api.GetFromJsonAsync<ClientReadOnlineResponse>($"api/client/read-online/{id}");
+            ClientReadOnlineResponse? data = null;
+            try
+            {
+                data = await api.GetFromJsonAsync<ClientReadOnlineResponse>($"api/client/read-online/{id}");
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Client read-online API request failed for bookId={BookId}", id);
+                TempData["Error"] = "Не удалось открыть книгу для чтения.";
+                return RedirectToAction(nameof(BookDetails), new { id });
+            }
             if (data?.Book == null)
                 return NotFound();
             if (string.IsNullOrWhiteSpace(data.FilePath))
@@ -197,14 +238,13 @@ namespace LibraryMPT.Controllers
             if (!ModelState.IsValid)
                 return BadRequest(ModelState);
 
-            var userId = User.GetUserId();
             var api = _httpClientFactory.CreateClient("LibraryApi");
             var response = await api.PostAsJsonAsync("api/client/bookmarks", new ClientBookmarkRequest
             {
                 Bookmark = bookmarkDto
             });
-            var payload = await response.Content.ReadFromJsonAsync<ApiCommandResponse>();
-            return Json(new { success = payload?.Success == true });
+            var payload = await ReadApiCommandResponseSafeAsync(response);
+            return Json(new { success = response.IsSuccessStatusCode && payload?.Success == true });
         }
 
         [HttpPost]
@@ -212,7 +252,7 @@ namespace LibraryMPT.Controllers
         {
             var api = _httpClientFactory.CreateClient("LibraryApi");
             var response = await api.DeleteAsync($"api/client/bookmarks/{bookmarkId}");
-            var payload = await response.Content.ReadFromJsonAsync<ApiCommandResponse>();
+            var payload = await ReadApiCommandResponseSafeAsync(response);
             if (payload?.Success != true)
                 return NotFound();
 
@@ -230,7 +270,7 @@ namespace LibraryMPT.Controllers
             {
                 Bookmark = bookmarkDto
             });
-            var payload = await response.Content.ReadFromJsonAsync<ApiCommandResponse>();
+            var payload = await ReadApiCommandResponseSafeAsync(response);
             if (payload?.Success != true)
                 return NotFound();
 
@@ -252,6 +292,34 @@ namespace LibraryMPT.Controllers
             var result = File(stream, contentType);
             result.EnableRangeProcessing = true;
             return result;
+        }
+
+        private static async Task<ApiCommandResponse?> ReadApiCommandResponseSafeAsync(HttpResponseMessage response)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            if (!IsJsonContent(response.Content.Headers.ContentType))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<ApiCommandResponse>(body, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private static bool IsJsonContent(MediaTypeHeaderValue? contentType)
+        {
+            var mediaType = contentType?.MediaType;
+            return !string.IsNullOrWhiteSpace(mediaType) &&
+                   mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

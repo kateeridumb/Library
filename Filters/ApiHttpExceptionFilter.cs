@@ -27,6 +27,14 @@ public sealed class ApiHttpExceptionFilter : IAsyncExceptionFilter
             await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             context.Result = new RedirectToActionResult("Login", "Account", null);
             context.ExceptionHandled = true;
+            return;
+        }
+
+        if (httpEx.StatusCode.HasValue && (int)httpEx.StatusCode.Value >= 500)
+        {
+            _logger.LogError(httpEx, "API returned server error {StatusCode}. Redirecting to error page.", (int)httpEx.StatusCode.Value);
+            context.Result = new RedirectToActionResult("Error", "Home", null);
+            context.ExceptionHandled = true;
         }
     }
 }

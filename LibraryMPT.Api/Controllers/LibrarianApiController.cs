@@ -2,8 +2,9 @@ using LibraryMPT.Data;
 using LibraryMPT.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using NpgsqlTypes;
 
 namespace LibraryMPT.Api.Controllers;
 
@@ -23,46 +24,46 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<LibrarianDashboardResponse>> Dashboard()
     {
         var stats = _context.LibrarianStats
-            .FromSqlRaw(@"
+            .FromSqlRaw("""
                 SELECT
-                    (SELECT COUNT(*) FROM Books) AS BooksCount,
-                    (SELECT COUNT(*) FROM Categories) AS CategoriesCount,
-                    (SELECT COUNT(*) FROM Users WHERE RoleID = 3) AS ActiveReadersCount,
-                    (SELECT COUNT(*) FROM BookLogs
-                     WHERE ActionAt >= DATEADD(MONTH, DATEDIFF(MONTH, 0, GETDATE()), 0)) AS ActionsThisMonth
-            ")
+                    (SELECT COUNT(*) FROM books) AS "BooksCount",
+                    (SELECT COUNT(*) FROM categories) AS "CategoriesCount",
+                    (SELECT COUNT(*) FROM users WHERE roleid = 3) AS "ActiveReadersCount",
+                    (SELECT COUNT(*) FROM booklogs WHERE actionat >= date_trunc('month', NOW())) AS "ActionsThisMonth"
+            """)
             .AsEnumerable()
             .FirstOrDefault() ?? new LibrarianStatsDto();
 
         var categoryStats = await _context.CategoryStats
-            .FromSqlRaw(@"
-                SELECT TOP 3
-                    c.CategoryName AS CategoryName,
-                    COUNT(b.BookID) AS BooksCount
-                FROM Categories c
-                LEFT JOIN Books b ON b.CategoryID = c.CategoryID
-                GROUP BY c.CategoryName
-                ORDER BY COUNT(b.BookID) DESC
-            ")
+            .FromSqlRaw("""
+                SELECT
+                    c.categoryname AS "CategoryName",
+                    COUNT(b.bookid)::int AS "BooksCount"
+                FROM categories c
+                LEFT JOIN books b ON b.categoryid = c.categoryid
+                GROUP BY c.categoryname
+                ORDER BY COUNT(b.bookid) DESC
+            """)
             .AsNoTracking()
             .ToListAsync();
 
         var lastBooks = await _context.LastBooks
-            .FromSqlRaw(@"
-                SELECT TOP 3
-                    b.Title AS Title,
-                    CONCAT(a.FirstName, ' ', a.LastName) AS Author,
-                    c.CategoryName AS Category
-                FROM Books b
-                INNER JOIN Authors a ON a.AuthorID = b.AuthorID
-                INNER JOIN Categories c ON c.CategoryID = b.CategoryID
-                ORDER BY b.BookID DESC
-            ")
+            .FromSqlRaw("""
+                SELECT
+                    b.title AS "Title",
+                    CONCAT(a.firstname, ' ', a.lastname) AS "Author",
+                    c.categoryname AS "Category"
+                FROM books b
+                INNER JOIN authors a ON a.authorid = b.authorid
+                INNER JOIN categories c ON c.categoryid = b.categoryid
+                ORDER BY b.bookid DESC
+                LIMIT 3
+            """)
             .AsNoTracking()
             .ToListAsync();
 
         var pendingSubscriptionsCount = await _context.Database
-            .SqlQuery<int>($"SELECT COUNT(*) AS Value FROM Subscriptions WHERE Status = 'Pending'")
+            .SqlQuery<int>($"SELECT COUNT(*)::int AS \"Value\" FROM subscriptions WHERE status = 'Pending'")
             .SingleAsync();
 
         return Ok(new LibrarianDashboardResponse
@@ -81,43 +82,67 @@ public sealed class LibrarianApiController : ControllerBase
         [FromQuery] int? authorId,
         [FromQuery] bool? requiresSubscription)
     {
-        var sql = """
-            SELECT
-                b.BookID,
-                b.Title,
-                b.AuthorID,
-                b.ImagePath,
-                b.Description,
-                b.CategoryID,
-                b.FilePath,
-                b.PublishYear,
-                b.PublisherID,
-                b.RequiresSubscription
-            FROM Books b
-            WHERE 
-                (@search IS NULL OR b.Title LIKE '%' + @search + '%')
-                AND (@categoryId IS NULL OR b.CategoryID = @categoryId)
-                AND (@authorId IS NULL OR b.AuthorID = @authorId)
-                AND (@requiresSubscription IS NULL OR b.RequiresSubscription = @requiresSubscription)
-            ORDER BY b.Title
-        """;
+        var searchParam = new NpgsqlParameter("@search", NpgsqlDbType.Text)
+        {
+            Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim()
+        };
+        var categoryParam = new NpgsqlParameter("@categoryId", NpgsqlDbType.Integer)
+        {
+            Value = categoryId.HasValue ? categoryId.Value : DBNull.Value
+        };
+        var authorParam = new NpgsqlParameter("@authorId", NpgsqlDbType.Integer)
+        {
+            Value = authorId.HasValue ? authorId.Value : DBNull.Value
+        };
+        var requiresSubscriptionParam = new NpgsqlParameter("@requiresSubscription", NpgsqlDbType.Boolean)
+        {
+            Value = requiresSubscription.HasValue ? requiresSubscription.Value : DBNull.Value
+        };
 
         var books = await _context.Books
-            .FromSqlRaw(sql,
-                new SqlParameter("@search", (object?)search ?? DBNull.Value),
-                new SqlParameter("@categoryId", (object?)categoryId ?? DBNull.Value),
-                new SqlParameter("@authorId", (object?)authorId ?? DBNull.Value),
-                new SqlParameter("@requiresSubscription", (object?)requiresSubscription ?? DBNull.Value))
+            .FromSqlRaw("""
+                SELECT
+                    b.bookid AS "BookID",
+                    b.title AS "Title",
+                    b.authorid AS "AuthorID",
+                    b.imagepath AS "ImagePath",
+                    b.description AS "Description",
+                    b.categoryid AS "CategoryID",
+                    b.filepath AS "FilePath",
+                    b.publishyear AS "PublishYear",
+                    b.publisherid AS "PublisherID",
+                    b.requiressubscription AS "RequiresSubscription"
+                FROM books b
+                WHERE
+                    (@search IS NULL OR b.title ILIKE '%' || @search || '%')
+                    AND (@categoryId IS NULL OR b.categoryid = @categoryId)
+                    AND (@authorId IS NULL OR b.authorid = @authorId)
+                    AND (@requiresSubscription IS NULL OR b.requiressubscription = @requiresSubscription)
+                ORDER BY b.title
+            """, searchParam, categoryParam, authorParam, requiresSubscriptionParam)
             .AsNoTracking()
             .ToListAsync();
 
         var categories = await _context.Categories
-            .FromSqlRaw("SELECT CategoryID, CategoryName FROM Categories ORDER BY CategoryName")
+            .FromSqlRaw("""
+                SELECT
+                    categoryid AS "CategoryID",
+                    categoryname AS "CategoryName"
+                FROM categories
+                ORDER BY categoryname
+            """)
             .AsNoTracking()
             .ToListAsync();
 
         var authors = await _context.Authors
-            .FromSqlRaw("SELECT AuthorID, FirstName, LastName FROM Authors ORDER BY LastName, FirstName")
+            .FromSqlRaw("""
+                SELECT
+                    authorid AS "AuthorID",
+                    firstname AS "FirstName",
+                    lastname AS "LastName"
+                FROM authors
+                ORDER BY lastname, firstname
+            """)
             .AsNoTracking()
             .ToListAsync();
 
@@ -133,7 +158,21 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<Book>> GetBook(int id)
     {
         var book = await _context.Books
-            .FromSqlRaw("SELECT * FROM Books WHERE BookID = @id", new SqlParameter("@id", id))
+            .FromSqlRaw("""
+                SELECT
+                    bookid AS "BookID",
+                    title AS "Title",
+                    description AS "Description",
+                    publishyear AS "PublishYear",
+                    categoryid AS "CategoryID",
+                    authorid AS "AuthorID",
+                    publisherid AS "PublisherID",
+                    filepath AS "FilePath",
+                    imagepath AS "ImagePath",
+                    requiressubscription AS "RequiresSubscription"
+                FROM books
+                WHERE bookid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
@@ -144,15 +183,33 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<LibrarianBookFormLookupsResponse>> BookLookups()
     {
         var categories = await _context.Categories
-            .FromSqlRaw("SELECT CategoryID, CategoryName FROM Categories")
+            .FromSqlRaw("""
+                SELECT
+                    categoryid AS "CategoryID",
+                    categoryname AS "CategoryName"
+                FROM categories
+            """)
             .AsNoTracking()
             .ToListAsync();
+
         var authors = await _context.Authors
-            .FromSqlRaw("SELECT AuthorID, FirstName, LastName FROM Authors")
+            .FromSqlRaw("""
+                SELECT
+                    authorid AS "AuthorID",
+                    firstname AS "FirstName",
+                    lastname AS "LastName"
+                FROM authors
+            """)
             .AsNoTracking()
             .ToListAsync();
+
         var publishers = await _context.Publisher
-            .FromSqlRaw("SELECT PublisherID, PublisherName FROM Publisher")
+            .FromSqlRaw("""
+                SELECT
+                    publisherid AS "PublisherID",
+                    publishername AS "PublisherName"
+                FROM publisher
+            """)
             .AsNoTracking()
             .ToListAsync();
 
@@ -167,75 +224,79 @@ public sealed class LibrarianApiController : ControllerBase
     [HttpPost("book")]
     public async Task<ActionResult<ApiCommandResponse>> AddBook([FromBody] Book book)
     {
-        _context.Database.ExecuteSqlRaw(@"
-            INSERT INTO Books (Title, Description, PublishYear, CategoryID, AuthorID, PublisherID, FilePath, RequiresSubscription)
-            VALUES (@title, @description, @year, @categoryId, @authId, @pubId, @filePath, @requiresSubscription)",
-            new SqlParameter("@title", book.Title.Trim()),
-            new SqlParameter("@description", (object?)book.Description?.Trim() ?? DBNull.Value),
-            new SqlParameter("@year", (object?)book.PublishYear ?? DBNull.Value),
-            new SqlParameter("@categoryId", book.CategoryID),
-            new SqlParameter("@authId", book.AuthorID),
-            new SqlParameter("@pubId", (object?)book.PublisherID ?? DBNull.Value),
-            new SqlParameter("@filePath", (object?)book.FilePath?.Trim() ?? DBNull.Value),
-            new SqlParameter("@requiresSubscription", book.RequiresSubscription)
-        );
+        await _context.Database.ExecuteSqlRawAsync("""
+            INSERT INTO books (title, description, publishyear, categoryid, authorid, publisherid, filepath, requiressubscription)
+            VALUES (@title, @description, @year, @categoryId, @authorId, @publisherId, @filePath, @requiresSubscription)
+        """,
+            new NpgsqlParameter("@title", book.Title.Trim()),
+            new NpgsqlParameter("@description", (object?)book.Description?.Trim() ?? DBNull.Value),
+            new NpgsqlParameter("@year", (object?)book.PublishYear ?? DBNull.Value),
+            new NpgsqlParameter("@categoryId", book.CategoryID),
+            new NpgsqlParameter("@authorId", book.AuthorID),
+            new NpgsqlParameter("@publisherId", (object?)book.PublisherID ?? DBNull.Value),
+            new NpgsqlParameter("@filePath", (object?)book.FilePath?.Trim() ?? DBNull.Value),
+            new NpgsqlParameter("@requiresSubscription", book.RequiresSubscription));
 
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpPut("book/{id:int}")]
-    public ActionResult<ApiCommandResponse> EditBook(int id, [FromBody] Book book)
+    public async Task<ActionResult<ApiCommandResponse>> EditBook(int id, [FromBody] Book book)
     {
         if (id != book.BookID)
         {
             return BadRequest(new ApiCommandResponse { Success = false, Message = "Book id mismatch." });
         }
 
-        _context.Database.ExecuteSqlRaw(@"
-            UPDATE Books
-            SET Title = @title,
-                Description = @description,
-                PublishYear = @year,
-                CategoryID = @categoryId,
-                AuthorID = @authId,
-                PublisherID = @pubId,
-                FilePath = @filePath,
-                RequiresSubscription = @requiresSubscription
-            WHERE BookID = @id",
-            new SqlParameter("@title", book.Title.Trim()),
-            new SqlParameter("@description", (object?)book.Description?.Trim() ?? DBNull.Value),
-            new SqlParameter("@year", (object?)book.PublishYear ?? DBNull.Value),
-            new SqlParameter("@categoryId", book.CategoryID),
-            new SqlParameter("@authId", book.AuthorID),
-            new SqlParameter("@pubId", (object?)book.PublisherID ?? DBNull.Value),
-            new SqlParameter("@filePath", (object?)book.FilePath?.Trim() ?? DBNull.Value),
-            new SqlParameter("@requiresSubscription", book.RequiresSubscription),
-            new SqlParameter("@id", book.BookID)
-        );
+        await _context.Database.ExecuteSqlRawAsync("""
+            UPDATE books
+            SET title = @title,
+                description = @description,
+                publishyear = @year,
+                categoryid = @categoryId,
+                authorid = @authorId,
+                publisherid = @publisherId,
+                filepath = @filePath,
+                requiressubscription = @requiresSubscription
+            WHERE bookid = @id
+        """,
+            new NpgsqlParameter("@title", book.Title.Trim()),
+            new NpgsqlParameter("@description", (object?)book.Description?.Trim() ?? DBNull.Value),
+            new NpgsqlParameter("@year", (object?)book.PublishYear ?? DBNull.Value),
+            new NpgsqlParameter("@categoryId", book.CategoryID),
+            new NpgsqlParameter("@authorId", book.AuthorID),
+            new NpgsqlParameter("@publisherId", (object?)book.PublisherID ?? DBNull.Value),
+            new NpgsqlParameter("@filePath", (object?)book.FilePath?.Trim() ?? DBNull.Value),
+            new NpgsqlParameter("@requiresSubscription", book.RequiresSubscription),
+            new NpgsqlParameter("@id", book.BookID));
 
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpDelete("book/{id:int}")]
-    public ActionResult<ApiCommandResponse> DeleteBook(int id)
+    public async Task<ActionResult<ApiCommandResponse>> DeleteBook(int id)
     {
-        _context.Database.ExecuteSqlRaw("DELETE FROM Books WHERE BookID = @id", new SqlParameter("@id", id));
+        await _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM books WHERE bookid = @id",
+            new NpgsqlParameter("@id", id));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpGet("categories")]
     public async Task<ActionResult<List<Category>>> Categories([FromQuery] string? search)
     {
-        var sql = @"
-            SELECT CategoryID, CategoryName 
-            FROM Categories 
-            WHERE (@search IS NULL OR CategoryName LIKE '%' + @search + '%')
-            ORDER BY CategoryName
-        ";
         var categories = await _context.Categories
-            .FromSqlRaw(sql, new SqlParameter("@search", (object?)search ?? DBNull.Value))
+            .FromSqlRaw("""
+                SELECT
+                    categoryid AS "CategoryID",
+                    categoryname AS "CategoryName"
+                FROM categories
+                WHERE (@search IS NULL OR categoryname ILIKE '%' || @search || '%')
+                ORDER BY categoryname
+            """, new NpgsqlParameter("@search", NpgsqlTypes.NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim() })
             .AsNoTracking()
             .ToListAsync();
+
         return Ok(categories);
     }
 
@@ -243,61 +304,68 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<Category>> CategoryById(int id)
     {
         var category = await _context.Categories
-            .FromSqlRaw("SELECT * FROM Categories WHERE CategoryID = @id", new SqlParameter("@id", id))
+            .FromSqlRaw("""
+                SELECT
+                    categoryid AS "CategoryID",
+                    categoryname AS "CategoryName"
+                FROM categories
+                WHERE categoryid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
+
         return category is null ? NotFound() : Ok(category);
     }
 
     [HttpPost("categories")]
-    public ActionResult<ApiCommandResponse> AddCategory([FromBody] Category category)
+    public async Task<ActionResult<ApiCommandResponse>> AddCategory([FromBody] Category category)
     {
-        _context.Database.ExecuteSqlRaw(
-            "INSERT INTO Categories (CategoryName) VALUES (@name)",
-            new SqlParameter("@name", category.CategoryName.Trim())
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO categories (categoryname) VALUES (@name)",
+            new NpgsqlParameter("@name", category.CategoryName.Trim()));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpPut("categories/{id:int}")]
-    public ActionResult<ApiCommandResponse> EditCategory(int id, [FromBody] Category category)
+    public async Task<ActionResult<ApiCommandResponse>> EditCategory(int id, [FromBody] Category category)
     {
         if (id != category.CategoryID)
         {
             return BadRequest(new ApiCommandResponse { Success = false, Message = "Category id mismatch." });
         }
 
-        _context.Database.ExecuteSqlRaw(
-            "UPDATE Categories SET CategoryName = @name WHERE CategoryID = @id",
-            new SqlParameter("@name", category.CategoryName.Trim()),
-            new SqlParameter("@id", category.CategoryID)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE categories SET categoryname = @name WHERE categoryid = @id",
+            new NpgsqlParameter("@name", category.CategoryName.Trim()),
+            new NpgsqlParameter("@id", category.CategoryID));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpDelete("categories/{id:int}")]
-    public ActionResult<ApiCommandResponse> DeleteCategory(int id)
+    public async Task<ActionResult<ApiCommandResponse>> DeleteCategory(int id)
     {
-        _context.Database.ExecuteSqlRaw(
-            "DELETE FROM Categories WHERE CategoryID = @id",
-            new SqlParameter("@id", id)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM categories WHERE categoryid = @id",
+            new NpgsqlParameter("@id", id));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpGet("authors")]
     public async Task<ActionResult<List<Author>>> Authors([FromQuery] string? search)
     {
-        var sql = @"
-            SELECT AuthorID, FirstName, LastName 
-            FROM Authors 
-            WHERE (@search IS NULL OR FirstName LIKE '%' + @search + '%' OR LastName LIKE '%' + @search + '%')
-            ORDER BY LastName, FirstName
-        ";
         var authors = await _context.Authors
-            .FromSqlRaw(sql, new SqlParameter("@search", (object?)search ?? DBNull.Value))
+            .FromSqlRaw("""
+                SELECT
+                    authorid AS "AuthorID",
+                    firstname AS "FirstName",
+                    lastname AS "LastName"
+                FROM authors
+                WHERE (@search IS NULL OR firstname ILIKE '%' || @search || '%' OR lastname ILIKE '%' || @search || '%')
+                ORDER BY lastname, firstname
+            """, new NpgsqlParameter("@search", NpgsqlTypes.NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim() })
             .AsNoTracking()
             .ToListAsync();
+
         return Ok(authors);
     }
 
@@ -305,63 +373,70 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<Author>> AuthorById(int id)
     {
         var author = await _context.Authors
-            .FromSqlRaw("SELECT * FROM Authors WHERE AuthorID = @id", new SqlParameter("@id", id))
+            .FromSqlRaw("""
+                SELECT
+                    authorid AS "AuthorID",
+                    firstname AS "FirstName",
+                    lastname AS "LastName"
+                FROM authors
+                WHERE authorid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
+
         return author is null ? NotFound() : Ok(author);
     }
 
     [HttpPost("authors")]
-    public ActionResult<ApiCommandResponse> AddAuthor([FromBody] Author author)
+    public async Task<ActionResult<ApiCommandResponse>> AddAuthor([FromBody] Author author)
     {
-        _context.Database.ExecuteSqlRaw(
-            "INSERT INTO Authors (FirstName, LastName) VALUES (@firstName, @lastName)",
-            new SqlParameter("@firstName", author.FirstName.Trim()),
-            new SqlParameter("@lastName", author.LastName.Trim())
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO authors (firstname, lastname) VALUES (@firstName, @lastName)",
+            new NpgsqlParameter("@firstName", author.FirstName.Trim()),
+            new NpgsqlParameter("@lastName", author.LastName.Trim()));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpPut("authors/{id:int}")]
-    public ActionResult<ApiCommandResponse> EditAuthor(int id, [FromBody] Author author)
+    public async Task<ActionResult<ApiCommandResponse>> EditAuthor(int id, [FromBody] Author author)
     {
         if (id != author.AuthorID)
         {
             return BadRequest(new ApiCommandResponse { Success = false, Message = "Author id mismatch." });
         }
 
-        _context.Database.ExecuteSqlRaw(
-            "UPDATE Authors SET FirstName = @firstName, LastName = @lastName WHERE AuthorID = @id",
-            new SqlParameter("@firstName", author.FirstName.Trim()),
-            new SqlParameter("@lastName", author.LastName.Trim()),
-            new SqlParameter("@id", author.AuthorID)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE authors SET firstname = @firstName, lastname = @lastName WHERE authorid = @id",
+            new NpgsqlParameter("@firstName", author.FirstName.Trim()),
+            new NpgsqlParameter("@lastName", author.LastName.Trim()),
+            new NpgsqlParameter("@id", author.AuthorID));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpDelete("authors/{id:int}")]
-    public ActionResult<ApiCommandResponse> DeleteAuthor(int id)
+    public async Task<ActionResult<ApiCommandResponse>> DeleteAuthor(int id)
     {
-        _context.Database.ExecuteSqlRaw(
-            "DELETE FROM Authors WHERE AuthorID = @id",
-            new SqlParameter("@id", id)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM authors WHERE authorid = @id",
+            new NpgsqlParameter("@id", id));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpGet("publishers")]
     public async Task<ActionResult<List<Publisher>>> Publishers([FromQuery] string? search)
     {
-        var sql = @"
-            SELECT PublisherID, PublisherName 
-            FROM Publisher 
-            WHERE (@search IS NULL OR PublisherName LIKE '%' + @search + '%')
-            ORDER BY PublisherName
-        ";
         var publishers = await _context.Publisher
-            .FromSqlRaw(sql, new SqlParameter("@search", (object?)search ?? DBNull.Value))
+            .FromSqlRaw("""
+                SELECT
+                    publisherid AS "PublisherID",
+                    publishername AS "PublisherName"
+                FROM publisher
+                WHERE (@search IS NULL OR publishername ILIKE '%' || @search || '%')
+                ORDER BY publishername
+            """, new NpgsqlParameter("@search", NpgsqlTypes.NpgsqlDbType.Text) { Value = string.IsNullOrWhiteSpace(search) ? DBNull.Value : search.Trim() })
             .AsNoTracking()
             .ToListAsync();
+
         return Ok(publishers);
     }
 
@@ -369,45 +444,49 @@ public sealed class LibrarianApiController : ControllerBase
     public async Task<ActionResult<Publisher>> PublisherById(int id)
     {
         var publisher = await _context.Publisher
-            .FromSqlRaw("SELECT * FROM Publisher WHERE PublisherID = @id", new SqlParameter("@id", id))
+            .FromSqlRaw("""
+                SELECT
+                    publisherid AS "PublisherID",
+                    publishername AS "PublisherName"
+                FROM publisher
+                WHERE publisherid = @id
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
+
         return publisher is null ? NotFound() : Ok(publisher);
     }
 
     [HttpPost("publishers")]
-    public ActionResult<ApiCommandResponse> AddPublisher([FromBody] Publisher publisher)
+    public async Task<ActionResult<ApiCommandResponse>> AddPublisher([FromBody] Publisher publisher)
     {
-        _context.Database.ExecuteSqlRaw(
-            "INSERT INTO Publisher (PublisherName) VALUES (@name)",
-            new SqlParameter("@name", publisher.PublisherName.Trim())
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "INSERT INTO publisher (publishername) VALUES (@name)",
+            new NpgsqlParameter("@name", publisher.PublisherName.Trim()));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpPut("publishers/{id:int}")]
-    public ActionResult<ApiCommandResponse> EditPublisher(int id, [FromBody] Publisher publisher)
+    public async Task<ActionResult<ApiCommandResponse>> EditPublisher(int id, [FromBody] Publisher publisher)
     {
         if (id != publisher.PublisherID)
         {
             return BadRequest(new ApiCommandResponse { Success = false, Message = "Publisher id mismatch." });
         }
 
-        _context.Database.ExecuteSqlRaw(
-            "UPDATE Publisher SET PublisherName = @name WHERE PublisherID = @id",
-            new SqlParameter("@name", publisher.PublisherName.Trim()),
-            new SqlParameter("@id", publisher.PublisherID)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "UPDATE publisher SET publishername = @name WHERE publisherid = @id",
+            new NpgsqlParameter("@name", publisher.PublisherName.Trim()),
+            new NpgsqlParameter("@id", publisher.PublisherID));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
     [HttpDelete("publishers/{id:int}")]
-    public ActionResult<ApiCommandResponse> DeletePublisher(int id)
+    public async Task<ActionResult<ApiCommandResponse>> DeletePublisher(int id)
     {
-        _context.Database.ExecuteSqlRaw(
-            "DELETE FROM Publisher WHERE PublisherID = @id",
-            new SqlParameter("@id", id)
-        );
+        await _context.Database.ExecuteSqlRawAsync(
+            "DELETE FROM publisher WHERE publisherid = @id",
+            new NpgsqlParameter("@id", id));
         return Ok(new ApiCommandResponse { Success = true });
     }
 
@@ -426,31 +505,33 @@ public sealed class LibrarianApiController : ControllerBase
         var requests = await _context.SubscriptionRequests
             .FromSqlRaw("""
                 SELECT
-                    s.SubscriptionID,
-                    s.FacultyID,
-                    s.Name AS SubscriptionName,
-                    s.DurationDays,
-                    s.Status,
-                    s.RequestedByUserID,
-                    u.Username AS RequestedByUsername,
-                    u.Email AS RequestedByEmail,
-                    f.FacultyName,
-                    (SELECT COUNT(*) FROM Users u2
-                     JOIN Roles r ON r.RoleID = u2.RoleID
-                     WHERE u2.FacultyID = s.FacultyID AND r.RoleName = 'Student') AS StudentsCount
-                FROM Subscriptions s
-                LEFT JOIN Users u ON u.UserID = s.RequestedByUserID
-                LEFT JOIN Faculty f ON f.FacultyID = s.FacultyID
-                WHERE s.RequestedByUserID IS NOT NULL
-                  AND (@status IS NULL OR s.Status = @status)
+                    s.subscriptionid AS "SubscriptionID",
+                    s.facultyid AS "FacultyID",
+                    s.name AS "SubscriptionName",
+                    s.durationdays AS "DurationDays",
+                    s.status AS "Status",
+                    s.requestedbyuserid AS "RequestedByUserID",
+                    u.username AS "RequestedByUsername",
+                    u.email AS "RequestedByEmail",
+                    f.facultyname AS "FacultyName",
+                    (
+                        SELECT COUNT(*)::int
+                        FROM users u2
+                        JOIN roles r ON r.roleid = u2.roleid
+                        WHERE u2.facultyid = s.facultyid AND r.rolename = 'Student'
+                    ) AS "StudentsCount"
+                FROM subscriptions s
+                LEFT JOIN users u ON u.userid = s.requestedbyuserid
+                LEFT JOIN faculty f ON f.facultyid = s.facultyid
+                WHERE s.requestedbyuserid IS NOT NULL
+                  AND (@status IS NULL OR s.status = @status)
                 ORDER BY
-                    CASE WHEN s.Status = 'Pending' THEN 1
-                         WHEN s.Status = 'Rejected' THEN 2
-                         WHEN s.Status = 'Approved' THEN 3
+                    CASE WHEN s.status = 'Pending' THEN 1
+                         WHEN s.status = 'Rejected' THEN 2
+                         WHEN s.status = 'Approved' THEN 3
                          ELSE 4 END,
-                    CASE WHEN s.Status IN ('Pending', 'Rejected') THEN s.SubscriptionID END ASC,
-                    s.SubscriptionID DESC
-            """, new SqlParameter("@status", statusParam))
+                    s.subscriptionid DESC
+            """, new NpgsqlParameter("@status", NpgsqlTypes.NpgsqlDbType.Text) { Value = statusParam })
             .AsNoTracking()
             .ToListAsync();
 
@@ -466,9 +547,10 @@ public sealed class LibrarianApiController : ControllerBase
     {
         var subscription = await _context.Subscriptions
             .FromSqlRaw("""
-                SELECT * FROM Subscriptions
-                WHERE SubscriptionID = @id AND Status = 'Pending'
-            """, new SqlParameter("@id", subscriptionId))
+                SELECT *
+                FROM subscriptions
+                WHERE subscriptionid = @id AND status = 'Pending'
+            """, new NpgsqlParameter("@id", subscriptionId))
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
@@ -485,15 +567,15 @@ public sealed class LibrarianApiController : ControllerBase
         var endDate = startDate.AddDays(subscription.DurationDays.Value);
 
         await _context.Database.ExecuteSqlRawAsync("""
-            UPDATE Subscriptions
-            SET Status = 'Approved',
-                StartDate = @startDate,
-                EndDate = @endDate
-            WHERE SubscriptionID = @id
+            UPDATE subscriptions
+            SET status = 'Approved',
+                startdate = @startDate,
+                enddate = @endDate
+            WHERE subscriptionid = @id
         """,
-            new SqlParameter("@startDate", startDate),
-            new SqlParameter("@endDate", endDate),
-            new SqlParameter("@id", subscriptionId));
+            new NpgsqlParameter("@startDate", startDate),
+            new NpgsqlParameter("@endDate", endDate),
+            new NpgsqlParameter("@id", subscriptionId));
 
         return Ok(new ApiCommandResponse
         {
@@ -507,9 +589,10 @@ public sealed class LibrarianApiController : ControllerBase
     {
         var subscription = await _context.Subscriptions
             .FromSqlRaw("""
-                SELECT * FROM Subscriptions
-                WHERE SubscriptionID = @id AND Status = 'Pending'
-            """, new SqlParameter("@id", subscriptionId))
+                SELECT *
+                FROM subscriptions
+                WHERE subscriptionid = @id AND status = 'Pending'
+            """, new NpgsqlParameter("@id", subscriptionId))
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
@@ -523,10 +606,10 @@ public sealed class LibrarianApiController : ControllerBase
         }
 
         await _context.Database.ExecuteSqlRawAsync("""
-            UPDATE Subscriptions
-            SET Status = 'Rejected'
-            WHERE SubscriptionID = @id
-        """, new SqlParameter("@id", subscriptionId));
+            UPDATE subscriptions
+            SET status = 'Rejected'
+            WHERE subscriptionid = @id
+        """, new NpgsqlParameter("@id", subscriptionId));
 
         return Ok(new ApiCommandResponse
         {

@@ -9,7 +9,7 @@ GO
 
 CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'MasterKeyPassword123!';
 GO
-select * from users
+select * from roles
 
 CREATE CERTIFICATE LibraryCert
 WITH SUBJECT = 'Library Encryption Certificate';
@@ -237,6 +237,7 @@ GO
 USE ElectronicLibraryv5;
 GO
 
+-- ===== Авторы =====
 INSERT INTO Authors (FirstName, LastName)
 VALUES
 ('Фёдор', 'Достоевский'),
@@ -246,6 +247,7 @@ VALUES
 ('Рэй', 'Брэдбери');
 GO
 
+-- ===== Категории =====
 INSERT INTO Categories (CategoryName)
 VALUES
 ('Классическая литература'),
@@ -254,6 +256,7 @@ VALUES
 ('Философия');
 GO
 
+-- ===== Издательства =====
 INSERT INTO Publisher (PublisherName)
 VALUES
 ('Эксмо'),
@@ -262,6 +265,7 @@ VALUES
 ('МИФ');
 GO
 
+-- ===== Книги =====
 INSERT INTO Books
 (Title, Description, PublishYear, CategoryID, AuthorID, PublisherID)
 VALUES
@@ -461,6 +465,7 @@ VALUES
 );
 GO
 
+-- это обновление системы подписок
 
 USE ElectronicLibraryv5;
 GO
@@ -508,6 +513,7 @@ GO
 
 PRINT 'Миграция завершена успешно';
 
+-- вот это прикол типа я поняла что для подписок надо чтоб стартдейт и энддейт были нуллейбл
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('Subscriptions') AND name = 'FacultyID' AND is_nullable = 0)
 BEGIN
@@ -560,6 +566,7 @@ GO
 
 PRINT 'Миграция завершена успешно';
 
+-- это для одобрения подписок библиотекарем 
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Subscriptions]') AND name = 'Status')
 BEGIN
     ALTER TABLE Subscriptions
@@ -601,6 +608,8 @@ PRINT 'Миграция завершена успешно';
 GO
 
 
+-- восстановление пароля
+
 IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Users]') AND name = 'PasswordResetToken')
 BEGIN
     ALTER TABLE Users
@@ -630,8 +639,10 @@ GO
 PRINT 'Миграция завершена успешно';
 GO
 
+-- Миграция: Увеличение размера столбцов OldData и NewData в таблице AuditLog
+-- Проблема: varchar(500) слишком мал для хранения JSON всех полей таблицы Users
 
-
+-- Увеличиваем размер столбца OldData до NVARCHAR(MAX)
 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[AuditLog]') AND name = 'OldData')
 BEGIN
     ALTER TABLE AuditLog
@@ -645,6 +656,7 @@ BEGIN
 END
 GO
 
+-- Увеличиваем размер столбца NewData до NVARCHAR(MAX)
 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[AuditLog]') AND name = 'NewData')
 BEGIN
     ALTER TABLE AuditLog
@@ -675,6 +687,7 @@ BEGIN
 END
 GO
 
+-- размер столбца NewData NVARCHAR(MAX)
 IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[AuditLog]') AND name = 'NewData')
 BEGIN
     ALTER TABLE AuditLog
@@ -699,6 +712,7 @@ BEGIN
 END
 GO
 
+-- Создаем новый триггер, который исключает чувствительные поля
 CREATE TRIGGER trg_Users_Audit
 ON Users
 AFTER INSERT, UPDATE, DELETE
@@ -766,7 +780,7 @@ GO
 PRINT 'Триггер trg_Users_Audit обновлен успешно';
 GO
 
-
+-- добавила закладки
 IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Bookmarks]') AND type in (N'U'))
 BEGIN
     CREATE TABLE Bookmarks (
@@ -799,4 +813,46 @@ BEGIN
 END
 GO
 
+-- SQL скрипт для добавления полей двухфакторной аутентификации в таблицу Users
+USE ElectronicLibraryv5;
+GO
 
+-- Добавляем поля для двухфакторной аутентификации
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'IsTwoFactorEnabled')
+BEGIN
+    ALTER TABLE Users
+    ADD IsTwoFactorEnabled BIT NOT NULL DEFAULT 0;
+    PRINT 'Поле IsTwoFactorEnabled добавлено';
+END
+ELSE
+BEGIN
+    PRINT 'Поле IsTwoFactorEnabled уже существует';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'TwoFactorCode')
+BEGIN
+    ALTER TABLE Users
+    ADD TwoFactorCode VARCHAR(10) NULL;
+    PRINT 'Поле TwoFactorCode добавлено';
+END
+ELSE
+BEGIN
+    PRINT 'Поле TwoFactorCode уже существует';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Users') AND name = 'TwoFactorCodeExpiry')
+BEGIN
+    ALTER TABLE Users
+    ADD TwoFactorCodeExpiry DATETIME NULL;
+    PRINT 'Поле TwoFactorCodeExpiry добавлено';
+END
+ELSE
+BEGIN
+    PRINT 'Поле TwoFactorCodeExpiry уже существует';
+END
+GO
+
+PRINT 'Миграция завершена успешно!';
+GO

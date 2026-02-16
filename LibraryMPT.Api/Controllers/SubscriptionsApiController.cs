@@ -2,7 +2,7 @@ using LibraryMPT.Data;
 using LibraryMPT.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryMPT.Api.Controllers;
@@ -65,7 +65,7 @@ public sealed class SubscriptionsApiController : ControllerBase
     {
         var subscription = await _context.Subscriptions
             .FromSqlRaw("SELECT * FROM Subscriptions WHERE SubscriptionID = @id",
-                new SqlParameter("@id", id))
+                new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
@@ -78,7 +78,7 @@ public sealed class SubscriptionsApiController : ControllerBase
         {
             subscription.Faculty = await _context.Faculty
                 .FromSqlRaw("SELECT * FROM Faculty WHERE FacultyID = @id",
-                    new SqlParameter("@id", subscription.FacultyID))
+                    new NpgsqlParameter("@id", subscription.FacultyID))
                 .AsNoTracking()
                 .FirstOrDefaultAsync();
         }
@@ -93,11 +93,11 @@ public sealed class SubscriptionsApiController : ControllerBase
             INSERT INTO Subscriptions (FacultyID, Name, StartDate, EndDate, DurationDays)
             VALUES (@facultyId, @name, @startDate, @endDate, @durationDays)
         """,
-            new SqlParameter("@facultyId", DBNull.Value),
-            new SqlParameter("@name", subscription.Name.Trim()),
-            new SqlParameter("@startDate", DBNull.Value),
-            new SqlParameter("@endDate", DBNull.Value),
-            new SqlParameter("@durationDays", (object?)subscription.DurationDays ?? DBNull.Value)
+            new NpgsqlParameter("@facultyId", DBNull.Value),
+            new NpgsqlParameter("@name", subscription.Name.Trim()),
+            new NpgsqlParameter("@startDate", DBNull.Value),
+            new NpgsqlParameter("@endDate", DBNull.Value),
+            new NpgsqlParameter("@durationDays", (object?)subscription.DurationDays ?? DBNull.Value)
         );
 
         return Ok();
@@ -108,7 +108,7 @@ public sealed class SubscriptionsApiController : ControllerBase
     {
         await _context.Database.ExecuteSqlRawAsync(
             "DELETE FROM Subscriptions WHERE SubscriptionID = @id",
-            new SqlParameter("@id", id)
+            new NpgsqlParameter("@id", id)
         );
 
         return Ok();

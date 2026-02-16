@@ -12,7 +12,7 @@ builder.Services.AddControllersWithViews(options =>
 });
 
 builder.Services.AddDbContext<LibraryContext>(options =>
-    options.UseSqlServer(
+    options.UseNpgsql(
         builder.Configuration.GetConnectionString("LibraryDb")
     )
 );
@@ -72,9 +72,11 @@ app.UseMiddleware<LibraryMPT.Middleware.RateLimitingMiddleware>();
 app.UseSession();
 
 
+app.UseExceptionHandler("/Home/Error");
+app.UseStatusCodePagesWithReExecute("/Home/Error", "?statusCode={0}");
+
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
     app.UseHsts();
 }
 

@@ -38,7 +38,7 @@
                             {
                                 <div class="position-absolute top-0 end-0 m-3">
                                     <span class="badge bg-warning text-dark px-3 py-2 shadow">
-                                        <i class="fas fa-crown me-1"></i> �������
+                                        <i class="fas fa-crown me-1"></i> Премиум
                                     </span>
                                 </div>
                             }
@@ -56,7 +56,7 @@
                                 </h1>
                                 <h5 class="text-muted">
                                     <i class="fas fa-user-pen me-2"></i>
-                                    @(Model.Author != null ? $"{Model.Author.FirstName} {Model.Author.LastName}" : "����� ����������")
+                                    @(Model.Author != null ? $"{Model.Author.FirstName} {Model.Author.LastName}" : "Автор неизвестен")
                                 </h5>
                             </div>
 
@@ -88,13 +88,13 @@
                             
                             <div class="mb-4">
                                 <h6 class="fw-bold text-uppercase text-muted mb-3">
-                                    <i class="fas fa-align-left me-2"></i>��������
+                                    <i class="fas fa-align-left me-2"></i>Описание
                                 </h6>
                                 <div class="p-3 rounded-3" style="background: #f8f9fa;">
                                     @if (string.IsNullOrWhiteSpace(Model.Description))
                                     {
                                         <p class="text-muted fst-italic mb-0">
-                                            �������� �����������
+                                            Описание отсутствует
                                         </p>
                                     }
                                     else
@@ -117,13 +117,13 @@
                                            asp-route-id="@Model.BookID"
                                            class="btn btn-lg px-4"
                                            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                                            <i class="fas fa-download me-2"></i>������� �����
+                                            <i class="fas fa-download me-2"></i>Скачать книгу
                                         </a>
                                     }
                                     else
                                     {
                                         <button class="btn btn-lg btn-secondary px-4" disabled>
-                                            <i class="fas fa-lock me-2"></i>������ �� ��������
+                                            <i class="fas fa-lock me-2"></i>Доступ по подписке
                                         </button>
                                     }
                                 }
@@ -131,7 +131,7 @@
                                 <form asp-controller="Client" asp-action="MarkAsRead" method="post" class="d-inline">
                                     <input type="hidden" name="bookId" value="@Model.BookID" />
                                     <button type="submit" class="btn btn-lg btn-outline-success px-4">
-                                        <i class="fas fa-check-circle me-2"></i>���������
+                                        <i class="fas fa-check-circle me-2"></i>Прочитано
                                     </button>
                                 </form>
                             </div>
@@ -144,7 +144,7 @@
                 
                 <div class="card-footer bg-light p-3 d-flex justify-content-between align-items-center">
                     <a asp-controller="Client" asp-action="Index" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left me-2"></i>����� � ��������
+                        <i class="fas fa-arrow-left me-2"></i>Назад в каталог
                     </a>
                     <span class="text-muted small">
                         <i class="fas fa-hashtag me-1"></i>ID: @Model.BookID

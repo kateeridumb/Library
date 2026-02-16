@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace LibraryMPT.Controllers
@@ -137,10 +139,11 @@ namespace LibraryMPT.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> Register(string firstName, string lastName, string email, string username, string password, bool personalDataConsent)
+        public async Task<IActionResult> Register(string firstName, string lastName, string email, string username, string password, int? selectedRoleId, bool personalDataConsent)
         {
             var api = _httpClientFactory.CreateClient("LibraryApi");
             ViewBag.Roles = await api.GetFromJsonAsync<List<Role>>("api/account/roles") ?? new List<Role>();
+            ViewBag.SelectedRoleId = selectedRoleId;
 
             if (!personalDataConsent)
             {
@@ -169,12 +172,39 @@ namespace LibraryMPT.Controllers
                 LastName = lastName,
                 Email = email,
                 Username = username,
-                Password = password
+                Password = password,
+                RoleId = selectedRoleId
             });
-            var payload = await response.Content.ReadFromJsonAsync<ApiCommandResponse>();
+
+            ApiCommandResponse? payload = null;
+            var body = await response.Content.ReadAsStringAsync();
+            if (IsJsonContent(response.Content.Headers.ContentType))
+            {
+                try
+                {
+                    payload = JsonSerializer.Deserialize<ApiCommandResponse>(body, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch (JsonException)
+                {
+                    payload = null;
+                }
+            }
+
             if (payload?.Success != true)
             {
-                ModelState.AddModelError("", payload?.Message ?? "Не удалось зарегистрироваться.");
+                var message = payload?.Message;
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    // API can return plain text/HTML on infrastructure errors; do not throw JSON parse errors in MVC.
+                    message = !string.IsNullOrWhiteSpace(body)
+                        ? $"Ошибка API ({(int)response.StatusCode}): {body}"
+                        : $"Ошибка API ({(int)response.StatusCode}).";
+                }
+
+                ModelState.AddModelError("", message);
                 return View();
             }
 
@@ -398,6 +428,17 @@ namespace LibraryMPT.Controllers
             if (!password.Any(char.IsDigit)) { error = "Пароль должен содержать хотя бы одну цифру"; return false; }
             error = null!;
             return true;
+        }
+
+        private static bool IsJsonContent(MediaTypeHeaderValue? contentType)
+        {
+            var mediaType = contentType?.MediaType;
+            if (string.IsNullOrWhiteSpace(mediaType))
+            {
+                return false;
+            }
+
+            return mediaType.Contains("json", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

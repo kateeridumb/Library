@@ -1,18 +1,18 @@
 @model List<Category>
 @{
-    ViewBag.Title = "���������";
+    ViewBag.Title = "Категории";
     Layout = "_Layout";
 }
 
 <div class="container fade-in">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">���������</h2>
+        <h2 class="mb-0">Категории</h2>
         <div class="d-flex gap-2">
             <a asp-action="Index" class="btn btn-outline-primary">
-                <i class="fas fa-arrow-left"></i> ����� � ������
+                <i class="fas fa-arrow-left"></i> Назад в панель
             </a>
             <a asp-action="AddCategory" class="btn btn-success">
-                <i class="fas fa-plus"></i> �������� ���������
+                <i class="fas fa-plus"></i> Добавить категорию
             </a>
         </div>
     </div>
@@ -22,16 +22,16 @@
         <div class="card-body">
             <form method="get" class="row g-3">
                 <div class="col-md-10">
-                    <label class="form-label">����� �� ��������</label>
+                    <label class="form-label">Поиск по названию</label>
                     <input type="text" name="search" class="form-control" 
-                           value="@ViewBag.Search" placeholder="������� �������� ���������...">
+                           value="@ViewBag.Search" placeholder="Введите название категории...">
                 </div>
                 <div class="col-md-2 d-flex align-items-end gap-2">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> �����
+                        <i class="fas fa-search"></i> Поиск
                     </button>
                     <a asp-action="CategoryManagement" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> �����
+                        <i class="fas fa-times"></i> Сброс
                     </a>
                 </div>
             </form>
@@ -42,8 +42,8 @@
         <table class="table table-hover align-middle">
         <thead class="table-light">
             <tr>
-                <th>��������</th>
-                <th class="text-end">��������</th>
+                <th>Название</th>
+                <th class="text-end">Действия</th>
             </tr>
         </thead>
         <tbody>
@@ -60,7 +60,7 @@
                         <a asp-action="DeleteCategory"
                            asp-route-id="@c.CategoryID"
                            class="btn btn-sm btn-danger"
-                           onclick="return confirm('������� ���������?')">
+                           onclick="return confirm('Удалить категорию?')">
                             <i class="fas fa-trash"></i>
                         </a>
                     </td>

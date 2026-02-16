@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using System.Net.Http.Json;
 
+namespace LibraryMPT.Controllers
+{
+
 [Authorize(Roles = "Librarian")]
 public class LibrarianController : Controller
 {
@@ -33,12 +36,28 @@ public class LibrarianController : Controller
     public async Task<IActionResult> BookManagement(string search, int? categoryId, int? authorId, bool? requiresSubscription)
     {
         var api = _httpClientFactory.CreateClient("LibraryApi");
-        var query = $"api/librarian/books?search={Uri.EscapeDataString(search ?? string.Empty)}" +
-                    $"&categoryId={(categoryId.HasValue ? categoryId.Value.ToString() : string.Empty)}" +
-                    $"&authorId={(authorId.HasValue ? authorId.Value.ToString() : string.Empty)}" +
-                    $"&requiresSubscription={(requiresSubscription.HasValue ? requiresSubscription.Value.ToString().ToLowerInvariant() : string.Empty)}";
-        var data = await api.GetFromJsonAsync<LibrarianBookManagementResponse>(query)
-            ?? new LibrarianBookManagementResponse();
+        var query = string.IsNullOrWhiteSpace(search)
+            ? "api/librarian/books"
+            : $"api/librarian/books?search={Uri.EscapeDataString(search)}";
+        if (categoryId.HasValue)
+            query += (query.Contains('?') ? "&" : "?") + $"categoryId={categoryId.Value}";
+        if (authorId.HasValue)
+            query += (query.Contains('?') ? "&" : "?") + $"authorId={authorId.Value}";
+        if (requiresSubscription.HasValue)
+            query += (query.Contains('?') ? "&" : "?") + $"requiresSubscription={requiresSubscription.Value.ToString().ToLowerInvariant()}";
+
+        LibrarianBookManagementResponse data;
+        try
+        {
+            data = await api.GetFromJsonAsync<LibrarianBookManagementResponse>(query)
+                ?? new LibrarianBookManagementResponse();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "Librarian BookManagement API request failed");
+            TempData["Error"] = "Не удалось загрузить управление книгами. Попробуйте еще раз.";
+            data = new LibrarianBookManagementResponse();
+        }
 
         ViewBag.Search = search;
         ViewBag.CategoryId = categoryId;
@@ -67,40 +86,40 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(book.Title))
         {
-            ModelState.AddModelError("", "�������� ����� �����������");
+            ModelState.AddModelError("", "Название книги обязательно");
         }
         else if (book.Title.Length > 200)
         {
-            ModelState.AddModelError("", "�������� ����� �� ������ ��������� 200 ��������");
+            ModelState.AddModelError("", "Название книги не должно превышать 200 символов");
         }
 
         if (book.CategoryID <= 0)
         {
-            ModelState.AddModelError("", "���������� ������� ���������");
+            ModelState.AddModelError("", "Необходимо выбрать категорию");
         }
 
         if (book.AuthorID <= 0)
         {
-            ModelState.AddModelError("", "���������� ������� ������");
+            ModelState.AddModelError("", "Необходимо выбрать автора");
         }
 
         if (string.IsNullOrWhiteSpace(book.FilePath))
         {
-            ModelState.AddModelError("", "���� � ����� ����������");
+            ModelState.AddModelError("", "Путь к файлу обязателен");
         }
         else if (book.FilePath.Length > 500)
         {
-            ModelState.AddModelError("", "���� � ����� �� ������ ��������� 500 ��������");
+            ModelState.AddModelError("", "Путь к файлу не должен превышать 500 символов");
         }
 
         if (book.PublishYear.HasValue && (book.PublishYear < 1000 || book.PublishYear > DateTime.Now.Year + 1))
         {
-            ModelState.AddModelError("", $"��� ������� ������ ���� ����� 1000 � {DateTime.Now.Year + 1}");
+            ModelState.AddModelError("", $"Год издания должен быть между 1000 и {DateTime.Now.Year + 1}");
         }
 
         if (book.Description != null && book.Description.Length > 2000)
         {
-            ModelState.AddModelError("", "�������� �� ������ ��������� 2000 ��������");
+            ModelState.AddModelError("", "Описание не должно превышать 2000 символов");
         }
 
         if (!ModelState.IsValid)
@@ -158,40 +177,40 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(book.Title))
         {
-            ModelState.AddModelError("", "�������� ����� �����������");
+            ModelState.AddModelError("", "Название книги обязательно");
         }
         else if (book.Title.Length > 200)
         {
-            ModelState.AddModelError("", "�������� ����� �� ������ ��������� 200 ��������");
+            ModelState.AddModelError("", "Название книги не должно превышать 200 символов");
         }
 
         if (book.CategoryID <= 0)
         {
-            ModelState.AddModelError("", "���������� ������� ���������");
+            ModelState.AddModelError("", "Необходимо выбрать категорию");
         }
 
         if (book.AuthorID <= 0)
         {
-            ModelState.AddModelError("", "���������� ������� ������");
+            ModelState.AddModelError("", "Необходимо выбрать автора");
         }
 
         if (string.IsNullOrWhiteSpace(book.FilePath))
         {
-            ModelState.AddModelError("", "���� � ����� ����������");
+            ModelState.AddModelError("", "Путь к файлу обязателен");
         }
         else if (book.FilePath.Length > 500)
         {
-            ModelState.AddModelError("", "���� � ����� �� ������ ��������� 500 ��������");
+            ModelState.AddModelError("", "Путь к файлу не должен превышать 500 символов");
         }
 
         if (book.PublishYear.HasValue && (book.PublishYear < 1000 || book.PublishYear > DateTime.Now.Year + 1))
         {
-            ModelState.AddModelError("", $"��� ������� ������ ���� ����� 1000 � {DateTime.Now.Year + 1}");
+            ModelState.AddModelError("", $"Год издания должен быть между 1000 и {DateTime.Now.Year + 1}");
         }
 
         if (book.Description != null && book.Description.Length > 2000)
         {
-            ModelState.AddModelError("", "�������� �� ������ ��������� 2000 ��������");
+            ModelState.AddModelError("", "Описание не должно превышать 2000 символов");
         }
 
         if (!ModelState.IsValid)
@@ -255,13 +274,13 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(category.CategoryName))
         {
-            ModelState.AddModelError("", "�������� ��������� �����������");
+            ModelState.AddModelError("", "Название категории обязательно");
             return View(category);
         }
 
         if (category.CategoryName.Length > 100)
         {
-            ModelState.AddModelError("", "�������� ��������� �� ������ ��������� 100 ��������");
+            ModelState.AddModelError("", "Название категории не должно превышать 100 символов");
             return View(category);
         }
 
@@ -299,13 +318,13 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(category.CategoryName))
         {
-            ModelState.AddModelError("", "�������� ��������� �����������");
+            ModelState.AddModelError("", "Название категории обязательно");
             return View(category);
         }
 
         if (category.CategoryName.Length > 100)
         {
-            ModelState.AddModelError("", "�������� ��������� �� ������ ��������� 100 ��������");
+            ModelState.AddModelError("", "Название категории не должно превышать 100 символов");
             return View(category);
         }
 
@@ -337,26 +356,26 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(author.FirstName))
         {
-            ModelState.AddModelError("", "��� ������ �����������");
+            ModelState.AddModelError("", "Имя автора обязательно");
             return View(author);
         }
 
         if (string.IsNullOrWhiteSpace(author.LastName))
         {
-            ModelState.AddModelError("", "������� ������ �����������");
+            ModelState.AddModelError("", "Фамилия автора обязательна");
             return View(author);
         }
 
         if (author.FirstName.Length > 50 || author.LastName.Length > 50)
         {
-            ModelState.AddModelError("", "��� � ������� �� ������ ��������� 50 ��������");
+            ModelState.AddModelError("", "Имя и фамилия не должны превышать 50 символов");
             return View(author);
         }
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(author.FirstName, @"^[A-Za-z�-��-���\s-]+$") ||
-            !System.Text.RegularExpressions.Regex.IsMatch(author.LastName, @"^[A-Za-z�-��-���\s-]+$"))
+        if (!System.Text.RegularExpressions.Regex.IsMatch(author.FirstName, @"^[A-Za-zА-Яа-яЁё\s-]+$") ||
+            !System.Text.RegularExpressions.Regex.IsMatch(author.LastName, @"^[A-Za-zА-Яа-яЁё\s-]+$"))
         {
-            ModelState.AddModelError("", "��� � ������� ������ ��������� ������ �����, ������� � ������");
+            ModelState.AddModelError("", "Имя и фамилия должны содержать только буквы, пробелы и дефисы");
             return View(author);
         }
 
@@ -387,26 +406,26 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(author.FirstName))
         {
-            ModelState.AddModelError("", "��� ������ �����������");
+            ModelState.AddModelError("", "Имя автора обязательно");
             return View(author);
         }
 
         if (string.IsNullOrWhiteSpace(author.LastName))
         {
-            ModelState.AddModelError("", "������� ������ �����������");
+            ModelState.AddModelError("", "Фамилия автора обязательна");
             return View(author);
         }
 
         if (author.FirstName.Length > 50 || author.LastName.Length > 50)
         {
-            ModelState.AddModelError("", "��� � ������� �� ������ ��������� 50 ��������");
+            ModelState.AddModelError("", "Имя и фамилия не должны превышать 50 символов");
             return View(author);
         }
 
-        if (!System.Text.RegularExpressions.Regex.IsMatch(author.FirstName, @"^[A-Za-z�-��-���\s-]+$") ||
-            !System.Text.RegularExpressions.Regex.IsMatch(author.LastName, @"^[A-Za-z�-��-���\s-]+$"))
+        if (!System.Text.RegularExpressions.Regex.IsMatch(author.FirstName, @"^[A-Za-zА-Яа-яЁё\s-]+$") ||
+            !System.Text.RegularExpressions.Regex.IsMatch(author.LastName, @"^[A-Za-zА-Яа-яЁё\s-]+$"))
         {
-            ModelState.AddModelError("", "��� � ������� ������ ��������� ������ �����, ������� � ������");
+            ModelState.AddModelError("", "Имя и фамилия должны содержать только буквы, пробелы и дефисы");
             return View(author);
         }
 
@@ -446,13 +465,13 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(publisher.PublisherName))
         {
-            ModelState.AddModelError("", "�������� ������������ �����������");
+            ModelState.AddModelError("", "Название издательства обязательно");
             return View(publisher);
         }
 
         if (publisher.PublisherName.Length > 200)
         {
-            ModelState.AddModelError("", "�������� ������������ �� ������ ��������� 200 ��������");
+            ModelState.AddModelError("", "Название издательства не должно превышать 200 символов");
             return View(publisher);
         }
 
@@ -483,13 +502,13 @@ public class LibrarianController : Controller
     {
         if (string.IsNullOrWhiteSpace(publisher.PublisherName))
         {
-            ModelState.AddModelError("", "�������� ������������ �����������");
+            ModelState.AddModelError("", "Название издательства обязательно");
             return View(publisher);
         }
 
         if (publisher.PublisherName.Length > 200)
         {
-            ModelState.AddModelError("", "�������� ������������ �� ������ ��������� 200 ��������");
+            ModelState.AddModelError("", "Название издательства не должно превышать 200 символов");
             return View(publisher);
         }
 
@@ -558,4 +577,5 @@ public class LibrarianController : Controller
         return RedirectToAction(nameof(SubscriptionRequests));
     }
 
+}
 }

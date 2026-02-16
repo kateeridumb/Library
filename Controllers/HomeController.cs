@@ -41,5 +41,29 @@ namespace LibraryMPT.Controllers
         {
             return View();
         }
+
+        public IActionResult Error(int? statusCode = null, string? message = null)
+        {
+            var status = statusCode ?? 500;
+            ViewBag.StatusCode = status;
+            ViewBag.RequestId = System.Diagnostics.Activity.Current?.Id ?? HttpContext.TraceIdentifier;
+            ViewBag.ErrorTitle = status switch
+            {
+                404 => "Страница не найдена",
+                403 => "Доступ запрещен",
+                500 => "Внутренняя ошибка сервера",
+                _ => "Произошла ошибка"
+            };
+            ViewBag.ErrorMessage = !string.IsNullOrWhiteSpace(message)
+                ? message
+                : (status switch
+                {
+                    404 => "Запрашиваемая страница не существует.",
+                    403 => "У вас нет доступа к этому ресурсу.",
+                    500 => "Произошла внутренняя ошибка сервера. Пожалуйста, попробуйте позже.",
+                    _ => "Произошла непредвиденная ошибка."
+                });
+            return View();
+        }
     }
 }

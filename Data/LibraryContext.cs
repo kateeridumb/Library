@@ -21,7 +21,6 @@ namespace LibraryMPT.Data
         public DbSet<Faculty> Faculty { get; set; }
         public DbSet<AuditLog> AuditLog { get; set; }
         public DbSet<BookLog> BookLogs { get; set; }
-        public DbSet<UserRole> UserRole { get; set; }
         public DbSet<AuthorBook> AuthorBook { get; set; }
         public DbSet<AuditSummaryDto> AuditSummaries { get; set; }
         public DbSet<LibrarianStatsDto> LibrarianStats { get; set; }

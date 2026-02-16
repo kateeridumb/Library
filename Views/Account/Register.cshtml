@@ -59,9 +59,23 @@
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label">Роль</label>
-                    <input class="form-control rounded-xl" value="Студент" disabled />
-                    <div class="form-text">Роль назначается автоматически.</div>
+                    <label class="form-label">Роль (временно)</label>
+                    <select name="selectedRoleId" class="form-select rounded-xl" required>
+                        <option value="">Выберите роль</option>
+                        @foreach (var role in (ViewBag.Roles as List<Role> ?? new List<Role>()))
+                        {
+                            var isSelected = ViewBag.SelectedRoleId != null && (int)ViewBag.SelectedRoleId == role.RoleID;
+                            if (isSelected)
+                            {
+                                <option value="@role.RoleID" selected>@role.RoleName</option>
+                            }
+                            else
+                            {
+                                <option value="@role.RoleID">@role.RoleName</option>
+                            }
+                        }
+                    </select>
+                    <div class="form-text">Режим для тестирования. Перед продом отключить.</div>
                 </div>
 
                 <div class="mb-4">

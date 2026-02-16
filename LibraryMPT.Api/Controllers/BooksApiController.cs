@@ -1,7 +1,7 @@
 using LibraryMPT.Data;
 using LibraryMPT.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Data.SqlClient;
+using Npgsql;
 using Microsoft.EntityFrameworkCore;
 
 namespace LibraryMPT.Api.Controllers;
@@ -60,7 +60,7 @@ public sealed class BooksApiController : ControllerBase
                     RequiresSubscription
                 FROM Books
                 WHERE BookID = @id
-            """, new SqlParameter("@id", id))
+            """, new NpgsqlParameter("@id", id))
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
@@ -105,14 +105,14 @@ public sealed class BooksApiController : ControllerBase
             VALUES
             (@Title, @Description, @PublishYear, @CategoryID, @AuthorID, @PublisherID, @FilePath, @ImagePath)
         """,
-            new SqlParameter("@Title", book.Title),
-            new SqlParameter("@Description", (object?)book.Description ?? DBNull.Value),
-            new SqlParameter("@PublishYear", (object?)book.PublishYear ?? DBNull.Value),
-            new SqlParameter("@CategoryID", book.CategoryID),
-            new SqlParameter("@AuthorID", book.AuthorID),
-            new SqlParameter("@PublisherID", (object?)book.PublisherID ?? DBNull.Value),
-            new SqlParameter("@FilePath", (object?)book.FilePath ?? DBNull.Value),
-            new SqlParameter("@ImagePath", (object?)book.ImagePath ?? DBNull.Value)
+            new NpgsqlParameter("@Title", book.Title),
+            new NpgsqlParameter("@Description", (object?)book.Description ?? DBNull.Value),
+            new NpgsqlParameter("@PublishYear", (object?)book.PublishYear ?? DBNull.Value),
+            new NpgsqlParameter("@CategoryID", book.CategoryID),
+            new NpgsqlParameter("@AuthorID", book.AuthorID),
+            new NpgsqlParameter("@PublisherID", (object?)book.PublisherID ?? DBNull.Value),
+            new NpgsqlParameter("@FilePath", (object?)book.FilePath ?? DBNull.Value),
+            new NpgsqlParameter("@ImagePath", (object?)book.ImagePath ?? DBNull.Value)
         );
 
         return Ok();
@@ -138,15 +138,15 @@ public sealed class BooksApiController : ControllerBase
                 ImagePath = @ImagePath
             WHERE BookID = @BookID
         """,
-            new SqlParameter("@Title", book.Title),
-            new SqlParameter("@Description", (object?)book.Description ?? DBNull.Value),
-            new SqlParameter("@PublishYear", (object?)book.PublishYear ?? DBNull.Value),
-            new SqlParameter("@CategoryID", book.CategoryID),
-            new SqlParameter("@AuthorID", book.AuthorID),
-            new SqlParameter("@PublisherID", (object?)book.PublisherID ?? DBNull.Value),
-            new SqlParameter("@FilePath", (object?)book.FilePath ?? DBNull.Value),
-            new SqlParameter("@ImagePath", (object?)book.ImagePath ?? DBNull.Value),
-            new SqlParameter("@BookID", book.BookID)
+            new NpgsqlParameter("@Title", book.Title),
+            new NpgsqlParameter("@Description", (object?)book.Description ?? DBNull.Value),
+            new NpgsqlParameter("@PublishYear", (object?)book.PublishYear ?? DBNull.Value),
+            new NpgsqlParameter("@CategoryID", book.CategoryID),
+            new NpgsqlParameter("@AuthorID", book.AuthorID),
+            new NpgsqlParameter("@PublisherID", (object?)book.PublisherID ?? DBNull.Value),
+            new NpgsqlParameter("@FilePath", (object?)book.FilePath ?? DBNull.Value),
+            new NpgsqlParameter("@ImagePath", (object?)book.ImagePath ?? DBNull.Value),
+            new NpgsqlParameter("@BookID", book.BookID)
         );
 
         return Ok();
@@ -157,7 +157,7 @@ public sealed class BooksApiController : ControllerBase
     {
         await _context.Database.ExecuteSqlRawAsync(
             "DELETE FROM Books WHERE BookID = @id",
-            new SqlParameter("@id", id)
+            new NpgsqlParameter("@id", id)
         );
 
         return Ok();
